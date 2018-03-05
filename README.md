@@ -1,2 +1,0 @@
-# samples-golang
-samples-golang
