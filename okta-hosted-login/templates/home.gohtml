@@ -1,0 +1,46 @@
+{{template "header"}}
+<body id="samples">
+<nav class="navbar navbar-default">
+  <div class="container-fluid">
+    <ul class="nav navbar-nav">
+      <li><a href="/">Home</a></li>
+      {{if .IsAuthenticated}}
+      <li><a id="profile-button" href="/profile">My Profile</a></li>
+      {{end}}
+    </ul>
+      {{if .IsAuthenticated}}
+    <form method="post" action="/logout" class="navbar-form navbar-right">
+      <button id="logout-button" type="submit" class="btn btn-danger">Logout</button>
+    </form>
+      {{end}}
+  </div>
+</nav>
+
+<div id="content" class="container">
+  <h2>Okta Hosted Login + Golang Example</h2>
+
+{{if .IsAuthenticated}}
+  <div>
+    <p>Welcome back, <span>{{.FirstName}}</span>!</p>
+    <p>You have successfully authenticated against your Okta org, and have been redirected back to this application.</p>
+    <p>Visit the <a href="profile">My Profile</a> page in this application to view the information
+      retrieved with your OAuth Access Token.</p>
+  </div>
+  {{else}}
+  <div>
+    <p>Hello!</p>
+    <p>If you're viewing this page then you have successfully configured and started this example server.</p>
+    <p>This example shows you how to to add the <a href="https://developer.okta
+            .com/authentication-guide/implementing-authentication/auth-code.html">Authorization Code Flow</a> to your PHP application.</p>
+    <p>When you click the login button below, you will be redirected to the login page on your Okta org.  After you authenticate, you will be returned to this application.</p>
+  </div>
+
+  <form method="get" action="login">
+    <button id="login-button" class="btn btn-primary" type="submit">Login</button>
+  </form>
+  {{end}}
+
+
+
+</div>
+{{template "footer"}}
