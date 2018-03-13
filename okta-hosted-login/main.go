@@ -1,16 +1,23 @@
 package main
 
 import (
+	"github.com/gorilla/sessions"
 	"net/http"
-	"html/template"
 	"os"
 	"fmt"
 	"encoding/base64"
+	"html/template"
+	"crypto/rand"
 	"bytes"
+	"io/ioutil"
+	"encoding/json"
+	oktaUtils "github.com/okta/samples-golang/okta-hosted-login/utils"
+	//"net/url"
 )
 
 var tpl *template.Template
-var state = "applicationState"
+var sessionStore = sessions.NewCookieStore([]byte("okta-hosted-login-session-store"))
+var state = "ApplicationState"
 
 func init() {
 
@@ -18,15 +25,57 @@ func init() {
 }
 
 func main() {
-	parseEnvironment()
+	oktaUtils.ParseEnvironment()
 
 	http.HandleFunc("/", HomeHandler)
 	http.HandleFunc("/login", LoginHandler)
-	http.HandleFunc("/authorization-code/callback", CallbackHandler)
+	http.HandleFunc("/authorization-code/callback", AuthCodeCallbackHandler)
+	http.HandleFunc("/profile", ProfileHandler)
+	http.HandleFunc("/logout", LogoutHandler)
+
 	http.ListenAndServe(":8080", nil)
 }
 
-func CallbackHandler(w http.ResponseWriter, r *http.Request) {
+func HomeHandler(w http.ResponseWriter, r *http.Request) {
+	type customData struct {
+		Profile map[string]string
+		IsAuthenticated bool
+	}
+
+	data := customData{
+		Profile: getProfileData(r),
+		IsAuthenticated: isAuthenticated(r),
+	}
+	tpl.ExecuteTemplate(w, "home.gohtml", data)
+}
+
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	var redirectPath string
+
+	nonceBytes := make([]byte, 32)
+	_, err := rand.Read(nonceBytes)
+	if err != nil {
+		fmt.Fprintln(w, "Could not generate nonce")
+		return
+	}
+
+
+	q := r.URL.Query()
+	q.Add("client_id", os.Getenv("CLIENT_ID"))
+	q.Add("response_type", "code")
+	q.Add("response_mode", "query")
+	q.Add("scope", "openid profile email")
+	q.Add("redirect_uri", "http://localhost:8080/authorization-code/callback")
+	q.Add("state", state)
+	q.Add("nonce", base64.URLEncoding.EncodeToString(nonceBytes))
+
+
+	redirectPath = os.Getenv("ISSUER") + "/v1/authorize?" + q.Encode()
+
+	http.Redirect(w, r, redirectPath, http.StatusMovedPermanently)
+}
+
+func AuthCodeCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	// Check the state that was returned in the query string is the same as the above state
 	if r.URL.Query().Get("state") != state {
 		fmt.Fprintln(w, "The state was not as expected")
@@ -38,14 +87,49 @@ func CallbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Exchange the code for an access_token
-	 exchangeCode(r.URL.Query().Get("code"), r)
-	// When access token is returned, verify that it is a valid token
+	exchange := exchangeCode(r.URL.Query().Get("code"), r)
 
-	// Store the token in a cookie
+	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	session.Values["id_token"] = exchange.IdToken
+	session.Values["access_token"] = exchange.AccessToken
+
+	session.Save(r, w)
+
+	http.Redirect(w, r, "/", http.StatusMovedPermanently)
 }
 
-func exchangeCode(code string, r *http.Request) string {
+func ProfileHandler(w http.ResponseWriter, r *http.Request) {
+	type customData struct {
+		Profile map[string]string
+		IsAuthenticated bool
+	}
+
+	data := customData{
+		Profile: getProfileData(r),
+		IsAuthenticated: isAuthenticated(r),
+	}
+	tpl.ExecuteTemplate(w, "profile.gohtml", data)
+}
+
+func LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	delete(session.Values, "id_token")
+	delete(session.Values, "access_token")
+
+	session.Save(r, w)
+
+	http.Redirect(w, r, "/", http.StatusMovedPermanently)
+}
+
+func exchangeCode(code string, r *http.Request) Exchange {
 	authHeader := base64.StdEncoding.EncodeToString(
 		[]byte(	os.Getenv("CLIENT_ID") + ":" + os.Getenv("CLIENT_SECRET")))
 
@@ -60,59 +144,63 @@ func exchangeCode(code string, r *http.Request) string {
 	h := req.Header
 	h.Add("Authorization", "Basic " + authHeader)
 	h.Add("Accept", "application/json")
-	h.Add("Content-Type", "application/x-www-form-url-encoded")
+	h.Add("Content-Type", "application/x-www-form-urlencoded")
 	h.Add("Connection", "close")
 	h.Add("Content-Length", "0")
 
 	client := &http.Client{}
-
-	fmt.Println(req)
-
 	resp, _ := client.Do(req)
-
+	body, _ := ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
+	var exchange Exchange
+	json.Unmarshal(body, &exchange)
 
-	return "hi"
+	return exchange
 
 }
 
-func HomeHandler(w http.ResponseWriter, r *http.Request) {
-	type customData struct {
-		FirstName string
-		IsAuthenticated bool
+func isAuthenticated(r *http.Request) bool {
+	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
+
+	if err != nil || session.Values["id_token"] == nil || session.Values["id_token"] == ""  {
+		return false
 	}
 
-	data := customData{
-		FirstName: getProfileData()["fname"],
-		IsAuthenticated: isAuthenticated(),
-	}
-	tpl.ExecuteTemplate(w, "home.gohtml", data)
+	return true
 }
 
-func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	var redirectPath string
-
-	q := r.URL.Query()
-	q.Add("client_id", os.Getenv("CLIENT_ID"))
-	q.Add("response_type", "code")
-	q.Add("response_mode", "query")
-	q.Add("scope", "openid profile")
-	q.Add("redirect_uri", "http://localhost:8080/authorization-code/callback")
-	q.Add("state", state)
-	q.Add("nonce", "nonce")
-
-
-	redirectPath = os.Getenv("ISSUER") + "/v1/authorize?" + q.Encode()
-	fmt.Println(redirectPath)
-	http.Redirect(w, r, redirectPath, http.StatusTemporaryRedirect)
-}
-
-func isAuthenticated() bool {
-	return false
-}
-
-func getProfileData() map[string]string {
+func getProfileData(r *http.Request) map[string]string {
 	m := make(map[string]string)
-	m["fname"] = "BrianRetterer"
+
+	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
+
+	if err != nil || session.Values["access_token"] == nil || session.Values["access_token"] == ""  {
+		return m
+	}
+
+	reqUrl := os.Getenv("ISSUER") + "/v1/userinfo"
+
+	req, _ := http.NewRequest("GET", reqUrl, bytes.NewReader([]byte("")))
+	h := req.Header
+	h.Add("Authorization", "Bearer " + session.Values["access_token"].(string))
+	h.Add("Accept", "application/json")
+
+	client := &http.Client{}
+	resp, _ := client.Do(req)
+	body, _ := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	json.Unmarshal(body, &m)
+
 	return m
+}
+
+
+type Exchange struct {
+	Error string `json:"error,omitempty"`
+	ErrorDescription string `json:"error_description,omitempty"`
+	AccessToken string `json:"access_token,omitempty"`
+	TokenType string `json:"token_type,omitempty"`
+	ExpiresIn int `json:"expires_in,omitempty"`
+	Scope string `json:"scope,omitempty"`
+	IdToken string `json:"id_token,omitempty"`
 }
