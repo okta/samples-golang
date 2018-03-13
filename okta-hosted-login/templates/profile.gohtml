@@ -1,0 +1,29 @@
+{{template "header" .}}
+<div id="content" class="container">
+
+  <div>
+    <h2>My Profile</h2>
+    <p>Hello, <span>{{ .Profile.name }}</span>. Below is the information that was read from the userinfo endpoint with
+      your <a href="https://developer.okta.com/docs/api/resources/oidc.html#get-user-information" target="_blank">Access Token</a> .
+    </p>
+
+  </div>
+
+  <table class="table table-striped">
+    <thead>
+    <tr>
+      <th>Claim</th>
+      <th>Value</th>
+    </tr>
+    </thead>
+    <tbody>
+      {{ range $key, $value := .Profile }}
+        <tr>
+          <td>{{ $key }}</td>
+          <td id="claim-{{$key}}">{{ $value }}</td>
+        </tr>
+      {{ end }}
+    </tbody>
+  </table>
+</div>
+{{template "footer"}}

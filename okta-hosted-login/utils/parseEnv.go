@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"os"
@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func parseEnvironment() {
+func ParseEnvironment() {
 	//useGlobalEnv := true
 	if _, err := os.Stat(".env"); os.IsNotExist(err) {
 		log.Printf("Environment Variable file (.env) is not present.  Relying on Global Environment Variables")

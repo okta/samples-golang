@@ -1,0 +1,35 @@
+{
+  "name": "@okta/samples-golang",
+  "version": "1.0.0",
+  "description": "Golang Sample Applications for Okta",
+  "author": "Brian Retterer <brian.retterer@okta.com>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/okta/samples-golang.git"
+  },
+  "bugs": {
+    "url": "https://github.com/okta/samples-golang/issues"
+  },
+  "homepage": "https://github.com/okta/samples-golang#readme",
+  "devDependencies": {
+    "cross-env": "^5.1.1",
+    "forever-monitor": "1.7.1",
+    "jasmine": "^3.0.0",
+    "jasmine-reporters": "2.2.0",
+    "protractor": "^5.1.0",
+    "wait-on": "2.0.2"
+  },
+  "scripts": {
+    "test": "npm run test:e2e",
+    "okta-hosted-login-server": "cd okta-hosted-login && go run main.go",
+    "test:okta-hosted-login": "if [[ -f .env.testing ]]; then source .env.testing; fi && protractor okta-oidc-tck/e2e-tests/okta-hosted-login/conf.js",
+    "custom-login-server": "composer sample:custom-login",
+    "test:custom-login": "protractor okta-oidc-tck/e2e-tests/custom-login/conf.js",
+    "resource-server": "composer sample:resource-server",
+    "test:resource-server": "jasmine okta-oidc-tck/resource-server/specs/okta-resource-server-spec.js",
+    "get-oidc-tck": "[ ! -d okta-oidc-tck/ ] && git clone https://github.com/okta/okta-oidc-tck.git || echo \"TCK already cloned\"",
+    "update-oidc-tck": "if [ -d okta-oidc-tck/ ]; then cd okta-oidc-tck && git pull; else echo \"TCK was not installed, installing\" && npm run get-oidc-tck; fi;",
+    "pretest": "webdriver-manager update --gecko false"
+  }
+}

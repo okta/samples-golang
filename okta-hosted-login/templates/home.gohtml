@@ -1,27 +1,12 @@
-{{template "header"}}
-<body id="samples">
-<nav class="navbar navbar-default">
-  <div class="container-fluid">
-    <ul class="nav navbar-nav">
-      <li><a href="/">Home</a></li>
-      {{if .IsAuthenticated}}
-      <li><a id="profile-button" href="/profile">My Profile</a></li>
-      {{end}}
-    </ul>
-      {{if .IsAuthenticated}}
-    <form method="post" action="/logout" class="navbar-form navbar-right">
-      <button id="logout-button" type="submit" class="btn btn-danger">Logout</button>
-    </form>
-      {{end}}
-  </div>
-</nav>
+{{template "header" .}}
+
 
 <div id="content" class="container">
   <h2>Okta Hosted Login + Golang Example</h2>
 
 {{if .IsAuthenticated}}
   <div>
-    <p>Welcome back, <span>{{.FirstName}}</span>!</p>
+    <p>Welcome back, <span>{{.Profile.name}}</span>!</p>
     <p>You have successfully authenticated against your Okta org, and have been redirected back to this application.</p>
     <p>Visit the <a href="profile">My Profile</a> page in this application to view the information
       retrieved with your OAuth Access Token.</p>
