@@ -7,17 +7,18 @@ import (
 	"fmt"
 	"encoding/base64"
 	"html/template"
-	"crypto/rand"
 	"bytes"
 	"io/ioutil"
 	"encoding/json"
 	oktaUtils "github.com/okta/samples-golang/okta-hosted-login/utils"
+	verifier "github.com/okta/okta-jwt-verifier-golang"
 	//"net/url"
 )
 
 var tpl *template.Template
 var sessionStore = sessions.NewCookieStore([]byte("okta-hosted-login-session-store"))
 var state = "ApplicationState"
+var nonce, _ = oktaUtils.GenerateNonce()
 
 func init() {
 
@@ -52,14 +53,6 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var redirectPath string
 
-	nonceBytes := make([]byte, 32)
-	_, err := rand.Read(nonceBytes)
-	if err != nil {
-		fmt.Fprintln(w, "Could not generate nonce")
-		return
-	}
-
-
 	q := r.URL.Query()
 	q.Add("client_id", os.Getenv("CLIENT_ID"))
 	q.Add("response_type", "code")
@@ -67,7 +60,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	q.Add("scope", "openid profile email")
 	q.Add("redirect_uri", "http://localhost:8080/authorization-code/callback")
 	q.Add("state", state)
-	q.Add("nonce", base64.URLEncoding.EncodeToString(nonceBytes))
+	q.Add("nonce", nonce)
 
 
 	redirectPath = os.Getenv("ISSUER") + "/v1/authorize?" + q.Encode()
@@ -94,10 +87,18 @@ func AuthCodeCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	session.Values["id_token"] = exchange.IdToken
-	session.Values["access_token"] = exchange.AccessToken
+	_, verificationError := verifyToken(exchange.IdToken)
 
-	session.Save(r, w)
+	if verificationError != nil {
+		fmt.Println(verificationError)
+	}
+
+	if verificationError == nil {
+		session.Values["id_token"] = exchange.IdToken
+		session.Values["access_token"] = exchange.AccessToken
+
+		session.Save(r, w)
+	}
 
 	http.Redirect(w, r, "/", http.StatusMovedPermanently)
 }
@@ -192,6 +193,29 @@ func getProfileData(r *http.Request) map[string]string {
 	json.Unmarshal(body, &m)
 
 	return m
+}
+
+func verifyToken(t string) (*verifier.Jwt, error) {
+	tv := map[string]string{}
+	tv["nonce"] = nonce
+	tv["aud"] = os.Getenv("CLIENT_ID")
+	jv := verifier.JwtVerifier{
+		Issuer: os.Getenv("ISSUER"),
+		ClientId: os.Getenv("CLIENT_ID"),
+		ClaimsToValidate: tv,
+	}
+
+	result, err := jv.Verify(t)
+
+	if err != nil {
+		return nil, fmt.Errorf("%s", err)
+	}
+
+	if result != nil {
+		return result, nil
+	}
+
+	return nil, fmt.Errorf("token could not be verified: %s", "")
 }
 
 
