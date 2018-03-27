@@ -49,3 +49,5 @@ If you see a home page that prompts you to login, then things are working!  Clic
 You can login with the same account that you created when signing up for your Developer Org, or you can use a known username and password from your Okta Directory.
 
 **Note:** If you are currently using your Developer Console, you already have a Single Sign-On (SSO) session for your Org.  You will be automatically logged into your application as the same user that is using the Developer Console.  You may want to use an incognito tab to test the flow from a blank slate.
+
+[OIDC Web Setup Instructions]: https://developer.okta.com/authentication-guide/implementing-authentication/auth-code#1-setting-up-your-application
