@@ -1,5 +1,5 @@
 # Golang + Okta Hosted Login Example
-This example shows you how to use Golang to login to your application with an Okta Hosted Login page.  The login is achieved through the [authorization code flow](https://developer.okta.com/authentication-guide/implementing-authentication/auth-code), where the user is redirected to the Okta-Hosted login page.  After the user authenticates they are redirected back to the application with an access code that is then exchanged for an access token.
+This example shows you how to use Golang to login to your application with a Custom Login page.  The login is achieved with the [Okta Sign In Widget][], which gives you more control to customize the login experience within your app.  After the user authenticates they are redirected back to the application with an authorization code that is then exchanged for an access token.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ To run this application, you first need to clone this repo and then enter into t
 
 ```bash
 git clone git@github.com:okta/samples-golang.git
-cd samples-golang/okta-hosted-login
+cd samples-golang/custom-login
 ```
 
 Then install dependencies:
@@ -44,10 +44,9 @@ go run main.go
 
 Now navigate to http://localhost:8080 in your browser.
 
-If you see a home page that prompts you to login, then things are working!  Clicking the **Log in** button will redirect you to the Okta hosted sign-in page.
+If you see a home page that prompts you to login, then things are working!  Clicking the **Log in** button will redirect you to the applicaitons custom sign-in page.
 
 You can login with the same account that you created when signing up for your Developer Org, or you can use a known username and password from your Okta Directory.
 
-**Note:** If you are currently using your Developer Console, you already have a Single Sign-On (SSO) session for your Org.  You will be automatically logged into your application as the same user that is using the Developer Console.  You may want to use an incognito tab to test the flow from a blank slate.
-
-[OIDC Web Setup Instructions]: https://developer.okta.com/authentication-guide/implementing-authentication/auth-code#1-setting-up-your-application
+[Okta Sign In Widget]: https://github.com/okta/okta-signin-widget
+[OIDC WEB Setup Instructions]: https://developer.okta.com/authentication-guide/implementing-authentication/auth-code#1-setting-up-your-application
