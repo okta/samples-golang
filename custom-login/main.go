@@ -12,7 +12,7 @@ import (
 	"encoding/json"
 	oktaUtils "github.com/okta/samples-golang/okta-hosted-login/utils"
 	verifier "github.com/okta/okta-jwt-verifier-golang"
-	//"net/url"
+	"net/url"
 )
 
 var tpl *template.Template
@@ -51,21 +51,27 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	var redirectPath string
+	type customData struct {
+		Profile map[string]string
+		IsAuthenticated bool
+		BaseUrl string
+		ClientId string
+		Issuer string
+		State string
+	}
 
-	q := r.URL.Query()
-	q.Add("client_id", os.Getenv("CLIENT_ID"))
-	q.Add("response_type", "code")
-	q.Add("response_mode", "query")
-	q.Add("scope", "openid profile email")
-	q.Add("redirect_uri", "http://localhost:8080/authorization-code/callback")
-	q.Add("state", state)
-	q.Add("nonce", nonce)
+	issuerParts, _ := url.Parse(os.Getenv("ISSUER"))
+	baseUrl := issuerParts.Scheme + "://" + issuerParts.Hostname()
 
-
-	redirectPath = os.Getenv("ISSUER") + "/v1/authorize?" + q.Encode()
-
-	http.Redirect(w, r, redirectPath, http.StatusMovedPermanently)
+	data := customData{
+		Profile: getProfileData(r),
+		IsAuthenticated: isAuthenticated(r),
+		BaseUrl: baseUrl,
+		ClientId: os.Getenv("CLIENT_ID"),
+		Issuer: os.Getenv("ISSUER"),
+		State: state,
+	}
+	tpl.ExecuteTemplate(w, "login.gohtml", data)
 }
 
 func AuthCodeCallbackHandler(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +87,7 @@ func AuthCodeCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	exchange := exchangeCode(r.URL.Query().Get("code"), r)
-
+	fmt.Printf("%+v\n", exchange)
 	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
