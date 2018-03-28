@@ -1,0 +1,22 @@
+{{template "header" .}}
+
+<div id="sign-in-widget"></div>
+<script type="text/javascript">
+  var config = {};
+  config.baseUrl = "{{ .BaseUrl }}";
+  config.clientId = "{{ .ClientId }}";
+  config.redirectUri = "http://localhost:8080/authorization-code/callback";
+  config.authParams = {
+    issuer: "{{ .Issuer }}",
+    responseType: 'code',
+    state: "{{ .State }}" || false,
+    display: 'page'
+  };
+  new OktaSignIn(config).renderEl(
+    { el: '#sign-in-widget' },
+    function (res) {
+    }
+  );
+</script>
+
+{{template "footer"}}
