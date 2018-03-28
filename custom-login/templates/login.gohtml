@@ -10,7 +10,8 @@
     issuer: "{{ .Issuer }}",
     responseType: 'code',
     state: "{{ .State }}" || false,
-    display: 'page'
+    display: 'page',
+    scope: ['openid', 'profile', 'email'],
   };
   new OktaSignIn(config).renderEl(
     { el: '#sign-in-widget' },

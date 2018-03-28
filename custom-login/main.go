@@ -16,7 +16,7 @@ import (
 )
 
 var tpl *template.Template
-var sessionStore = sessions.NewCookieStore([]byte("okta-hosted-login-session-store"))
+var sessionStore = sessions.NewCookieStore([]byte("okta-custom-login-session-store"))
 var state = "ApplicationState"
 var nonce, _ = oktaUtils.GenerateNonce()
 
@@ -87,8 +87,8 @@ func AuthCodeCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	exchange := exchangeCode(r.URL.Query().Get("code"), r)
-	fmt.Printf("%+v\n", exchange)
-	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
+
+	session, err := sessionStore.Get(r, "okta-custom-login-session-store")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -123,7 +123,7 @@ func ProfileHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
-	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
+	session, err := sessionStore.Get(r, "okta-custom-login-session-store")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -167,7 +167,7 @@ func exchangeCode(code string, r *http.Request) Exchange {
 }
 
 func isAuthenticated(r *http.Request) bool {
-	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
+	session, err := sessionStore.Get(r, "okta-custom-login-session-store")
 
 	if err != nil || session.Values["id_token"] == nil || session.Values["id_token"] == ""  {
 		return false
@@ -179,7 +179,7 @@ func isAuthenticated(r *http.Request) bool {
 func getProfileData(r *http.Request) map[string]string {
 	m := make(map[string]string)
 
-	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
+	session, err := sessionStore.Get(r, "okta-custom-login-session-store")
 
 	if err != nil || session.Values["access_token"] == nil || session.Values["access_token"] == ""  {
 		return m
