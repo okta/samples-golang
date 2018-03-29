@@ -10,7 +10,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"encoding/json"
-	oktaUtils "github.com/okta/samples-golang/okta-hosted-login/utils"
+	oktaUtils "github.com/okta/samples-golang/custom-login/utils"
 	verifier "github.com/okta/okta-jwt-verifier-golang"
 	"net/url"
 )
