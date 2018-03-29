@@ -26,7 +26,7 @@
     "test:okta-hosted-login": "if [[ -f .env.testing ]]; then source .env.testing; fi && protractor okta-oidc-tck/e2e-tests/okta-hosted-login/conf.js",
     "custom-login-server": "cd custom-login && go run main.go",
     "test:custom-login": "if [[ -f .env.testing ]]; then source .env.testing; fi && protractor okta-oidc-tck/e2e-tests/custom-login/conf.js",
-    "resource-server": "composer sample:resource-server",
+    "resource-server": "cd resource-server && go run main.go",
     "test:resource-server": "jasmine okta-oidc-tck/resource-server/specs/okta-resource-server-spec.js",
     "get-oidc-tck": "[ ! -d okta-oidc-tck/ ] && git clone https://github.com/okta/okta-oidc-tck.git || echo \"TCK already cloned\"",
     "update-oidc-tck": "if [ -d okta-oidc-tck/ ]; then cd okta-oidc-tck && git pull; else echo \"TCK was not installed, installing\" && npm run get-oidc-tck; fi;",
