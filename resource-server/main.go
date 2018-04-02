@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"os"
+	"encoding/json"
 )
 
 func main() {
@@ -15,7 +16,7 @@ func main() {
 	http.HandleFunc("/", HomeHandler)
 	http.HandleFunc("/api/messages", ApiMessagesHandler)
 
-	http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":8000", nil)
 }
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
@@ -29,14 +30,30 @@ func ApiMessagesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	messages := []byte(`"messages": [{"date": 1522272240, "text": "I am a robot."},{"date": 1522268640, 
-"text": "Hello, World!"}]`)
 
+	m1 := Message{1522272240, "I am a robot."}
+	m2 := Message{1522268640, "Hello, World!"}
+	allMessages := []Message{}
+	allMessages = append(allMessages, m1)
+	allMessages = append(allMessages, m2)
+
+	mess := Messages{
+		allMessages,
+	}
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(messages)
+	json.NewEncoder(w).Encode(mess)
 
+
+}
+type Message struct {
+	Date float64 `json:"date"`
+	Text string `json:"text"`
+}
+
+type Messages struct {
+	MessageList []Message `json:"messages"`
 }
 
 func isAuthenticated(r *http.Request) bool {
