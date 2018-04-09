@@ -24,7 +24,13 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func ApiMessagesHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Add("Access-Control-Allow-Origin", "*")
+	w.Header().Add("Access-Control-Allow-Headers", "Content-Type, authorization")
+	w.Header().Add("Access-Control-Allow-Methods", "GET, POST,OPTIONS")
+
+	if r.Method == "OPTIONS" {
+		return
+	}
 
 	if !isAuthenticated(r) {
 		w.WriteHeader(http.StatusUnauthorized)
