@@ -24,6 +24,8 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func ApiMessagesHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
 	if !isAuthenticated(r) {
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write([]byte("401 - You are not authorized for this request"))
