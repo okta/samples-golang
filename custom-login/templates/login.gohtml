@@ -12,6 +12,7 @@
     state: "{{ .State }}" || false,
     display: 'page',
     scope: ['openid', 'profile', 'email'],
+    nonce: '{{ .Nonce }}',
   };
   new OktaSignIn(config).renderEl(
     { el: '#sign-in-widget' },
