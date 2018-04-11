@@ -66,10 +66,11 @@ type Messages struct {
 
 func isAuthenticated(r *http.Request) bool {
 	authHeader := r.Header.Get("Authorization")
+
 	if authHeader == "" {
 		return false
 	}
-	tokenParts := strings.Split(authHeader, "Bearer")
+	tokenParts := strings.Split(authHeader, "Bearer ")
 	bearerToken := tokenParts[1]
 
 	tv := map[string]string{}
