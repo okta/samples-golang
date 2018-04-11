@@ -58,6 +58,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		ClientId string
 		Issuer string
 		State string
+		Nonce string
 	}
 
 	issuerParts, _ := url.Parse(os.Getenv("ISSUER"))
@@ -70,6 +71,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		ClientId: os.Getenv("CLIENT_ID"),
 		Issuer: os.Getenv("ISSUER"),
 		State: state,
+		Nonce: nonce,
 	}
 	tpl.ExecuteTemplate(w, "login.gohtml", data)
 }
