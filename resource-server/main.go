@@ -1,13 +1,13 @@
 package main
 
 import (
-	"net/http"
-	oktaUtils "github.com/okta/samples-golang/resource-server/utils"
-	verifier "github.com/okta/okta-jwt-verifier-golang"
-	"fmt"
-	"strings"
-	"os"
 	"encoding/json"
+	"fmt"
+	verifier "github.com/okta/okta-jwt-verifier-golang"
+	oktaUtils "github.com/okta/samples-golang/resource-server/utils"
+	"net/http"
+	"os"
+	"strings"
 )
 
 func main() {
@@ -38,7 +38,6 @@ func ApiMessagesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	m1 := Message{1522272240, "I am a robot."}
 	m2 := Message{1522268640, "Hello, World!"}
 	allMessages := []Message{}
@@ -53,11 +52,11 @@ func ApiMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(mess)
 
-
 }
+
 type Message struct {
 	Date float64 `json:"date"`
-	Text string `json:"text"`
+	Text string  `json:"text"`
 }
 
 type Messages struct {
@@ -76,8 +75,8 @@ func isAuthenticated(r *http.Request) bool {
 	tv := map[string]string{}
 	tv["aud"] = "api://default"
 	jv := verifier.JwtVerifier{
-		Issuer: os.Getenv("ISSUER"),
-		ClientId: os.Getenv("CLIENT_ID"),
+		Issuer:           os.Getenv("ISSUER"),
+		ClientId:         os.Getenv("CLIENT_ID"),
 		ClaimsToValidate: tv,
 	}
 
