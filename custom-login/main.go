@@ -209,11 +209,10 @@ func verifyToken(t string) (*verifier.Jwt, error) {
 	tv["aud"] = os.Getenv("CLIENT_ID")
 	jv := verifier.JwtVerifier{
 		Issuer:           os.Getenv("ISSUER"),
-		ClientId:         os.Getenv("CLIENT_ID"),
 		ClaimsToValidate: tv,
 	}
 
-	result, err := jv.New().Verify(t)
+	result, err := jv.New().VerifyIdToken(t)
 
 	if err != nil {
 		return nil, fmt.Errorf("%s", err)
