@@ -76,11 +76,10 @@ func isAuthenticated(r *http.Request) bool {
 	tv["aud"] = "api://default"
 	jv := verifier.JwtVerifier{
 		Issuer:           os.Getenv("ISSUER"),
-		ClientId:         os.Getenv("CLIENT_ID"),
 		ClaimsToValidate: tv,
 	}
 
-	_, err := jv.New().Verify(bearerToken)
+	_, err := jv.New().VerifyAccessToken(bearerToken)
 
 	if err != nil {
 		return false
