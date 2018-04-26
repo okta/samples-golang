@@ -1,18 +1,17 @@
 package main
 
 import (
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"github.com/gorilla/sessions"
+	verifier "github.com/okta/okta-jwt-verifier-golang"
+	oktaUtils "github.com/okta/samples-golang/okta-hosted-login/utils"
+	"html/template"
+	"io/ioutil"
 	"net/http"
 	"os"
-	"fmt"
-	"encoding/base64"
-	"html/template"
-	"bytes"
-	"io/ioutil"
-	"encoding/json"
-	oktaUtils "github.com/okta/samples-golang/okta-hosted-login/utils"
-	verifier "github.com/okta/okta-jwt-verifier-golang"
-	//"net/url"
 )
 
 var tpl *template.Template
@@ -39,12 +38,12 @@ func main() {
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	type customData struct {
-		Profile map[string]string
+		Profile         map[string]string
 		IsAuthenticated bool
 	}
 
 	data := customData{
-		Profile: getProfileData(r),
+		Profile:         getProfileData(r),
 		IsAuthenticated: isAuthenticated(r),
 	}
 	tpl.ExecuteTemplate(w, "home.gohtml", data)
@@ -61,7 +60,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	q.Add("redirect_uri", "http://localhost:8080/authorization-code/callback")
 	q.Add("state", state)
 	q.Add("nonce", nonce)
-
 
 	redirectPath = os.Getenv("ISSUER") + "/v1/authorize?" + q.Encode()
 
@@ -105,12 +103,12 @@ func AuthCodeCallbackHandler(w http.ResponseWriter, r *http.Request) {
 
 func ProfileHandler(w http.ResponseWriter, r *http.Request) {
 	type customData struct {
-		Profile map[string]string
+		Profile         map[string]string
 		IsAuthenticated bool
 	}
 
 	data := customData{
-		Profile: getProfileData(r),
+		Profile:         getProfileData(r),
 		IsAuthenticated: isAuthenticated(r),
 	}
 	tpl.ExecuteTemplate(w, "profile.gohtml", data)
@@ -132,7 +130,7 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 
 func exchangeCode(code string, r *http.Request) Exchange {
 	authHeader := base64.StdEncoding.EncodeToString(
-		[]byte(	os.Getenv("CLIENT_ID") + ":" + os.Getenv("CLIENT_SECRET")))
+		[]byte(os.Getenv("CLIENT_ID") + ":" + os.Getenv("CLIENT_SECRET")))
 
 	q := r.URL.Query()
 	q.Add("grant_type", "authorization_code")
@@ -143,7 +141,7 @@ func exchangeCode(code string, r *http.Request) Exchange {
 
 	req, _ := http.NewRequest("POST", url, bytes.NewReader([]byte("")))
 	h := req.Header
-	h.Add("Authorization", "Basic " + authHeader)
+	h.Add("Authorization", "Basic "+authHeader)
 	h.Add("Accept", "application/json")
 	h.Add("Content-Type", "application/x-www-form-urlencoded")
 	h.Add("Connection", "close")
@@ -163,7 +161,7 @@ func exchangeCode(code string, r *http.Request) Exchange {
 func isAuthenticated(r *http.Request) bool {
 	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
 
-	if err != nil || session.Values["id_token"] == nil || session.Values["id_token"] == ""  {
+	if err != nil || session.Values["id_token"] == nil || session.Values["id_token"] == "" {
 		return false
 	}
 
@@ -175,7 +173,7 @@ func getProfileData(r *http.Request) map[string]string {
 
 	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
 
-	if err != nil || session.Values["access_token"] == nil || session.Values["access_token"] == ""  {
+	if err != nil || session.Values["access_token"] == nil || session.Values["access_token"] == "" {
 		return m
 	}
 
@@ -183,7 +181,7 @@ func getProfileData(r *http.Request) map[string]string {
 
 	req, _ := http.NewRequest("GET", reqUrl, bytes.NewReader([]byte("")))
 	h := req.Header
-	h.Add("Authorization", "Bearer " + session.Values["access_token"].(string))
+	h.Add("Authorization", "Bearer "+session.Values["access_token"].(string))
 	h.Add("Accept", "application/json")
 
 	client := &http.Client{}
@@ -200,8 +198,8 @@ func verifyToken(t string) (*verifier.Jwt, error) {
 	tv["nonce"] = nonce
 	tv["aud"] = os.Getenv("CLIENT_ID")
 	jv := verifier.JwtVerifier{
-		Issuer: os.Getenv("ISSUER"),
-		ClientId: os.Getenv("CLIENT_ID"),
+		Issuer:           os.Getenv("ISSUER"),
+		ClientId:         os.Getenv("CLIENT_ID"),
 		ClaimsToValidate: tv,
 	}
 
@@ -218,13 +216,12 @@ func verifyToken(t string) (*verifier.Jwt, error) {
 	return nil, fmt.Errorf("token could not be verified: %s", "")
 }
 
-
 type Exchange struct {
-	Error string `json:"error,omitempty"`
+	Error            string `json:"error,omitempty"`
 	ErrorDescription string `json:"error_description,omitempty"`
-	AccessToken string `json:"access_token,omitempty"`
-	TokenType string `json:"token_type,omitempty"`
-	ExpiresIn int `json:"expires_in,omitempty"`
-	Scope string `json:"scope,omitempty"`
-	IdToken string `json:"id_token,omitempty"`
+	AccessToken      string `json:"access_token,omitempty"`
+	TokenType        string `json:"token_type,omitempty"`
+	ExpiresIn        int    `json:"expires_in,omitempty"`
+	Scope            string `json:"scope,omitempty"`
+	IdToken          string `json:"id_token,omitempty"`
 }
