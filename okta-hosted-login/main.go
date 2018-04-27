@@ -17,7 +17,7 @@ import (
 var tpl *template.Template
 var sessionStore = sessions.NewCookieStore([]byte("okta-hosted-login-session-store"))
 var state = "ApplicationState"
-var nonce, _ = oktaUtils.GenerateNonce()
+var nonce = "NonceNotSetYet"
 
 func init() {
 
@@ -50,6 +50,7 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	nonce, _ = oktaUtils.GenerateNonce()
 	var redirectPath string
 
 	q := r.URL.Query()

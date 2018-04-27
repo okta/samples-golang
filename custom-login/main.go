@@ -18,7 +18,7 @@ import (
 var tpl *template.Template
 var sessionStore = sessions.NewCookieStore([]byte("okta-custom-login-session-store"))
 var state = "ApplicationState"
-var nonce, _ = oktaUtils.GenerateNonce()
+var nonce = "NonceNotSetYet"
 
 func init() {
 
@@ -51,6 +51,7 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	nonce, _ = oktaUtils.GenerateNonce()
 	type customData struct {
 		Profile         map[string]string
 		IsAuthenticated bool
@@ -204,6 +205,7 @@ func getProfileData(r *http.Request) map[string]string {
 }
 
 func verifyToken(t string) (*verifier.Jwt, error) {
+	fmt.Println(nonce)
 	tv := map[string]string{}
 	tv["nonce"] = nonce
 	tv["aud"] = os.Getenv("CLIENT_ID")
