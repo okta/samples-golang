@@ -74,6 +74,7 @@ func isAuthenticated(r *http.Request) bool {
 
 	tv := map[string]string{}
 	tv["aud"] = "api://default"
+	tv["cid"] = os.Getenv("CLIENT_ID")
 	jv := verifier.JwtVerifier{
 		Issuer:           os.Getenv("ISSUER"),
 		ClaimsToValidate: tv,
