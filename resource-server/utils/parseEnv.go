@@ -15,10 +15,16 @@ func ParseEnvironment() {
 	}
 
 	setEnvVariable("CLIENT_ID", os.Getenv("CLIENT_ID"))
+	setEnvVariable("SPA_CLIENT_ID", os.Getenv("SPA_CLIENT_ID"))
 	setEnvVariable("ISSUER", os.Getenv("ISSUER"))
 
 	if os.Getenv("CLIENT_ID") == "" {
 		log.Printf("Could not resolve a CLIENT_ID environment variable.")
+		os.Exit(1)
+	}
+
+	if os.Getenv("SPA_CLIENT_ID") == "" {
+		log.Printf("Could not resolve a SPA_CLIENT_ID environment variable.")
 		os.Exit(1)
 	}
 
