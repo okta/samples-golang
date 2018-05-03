@@ -1,7 +1,19 @@
 language: go
 
 go:
-  - 1.8.x
   - 1.9.x
   - 1.10.x
   - tip
+
+matrix:
+  allow_failures:
+    - go: tip
+
+before_install:
+  - sudo apt-get install -y nodejs
+
+install:
+  - npm install
+
+script:
+  - npm test
