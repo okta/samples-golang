@@ -16,7 +16,7 @@ func main() {
 	http.HandleFunc("/", HomeHandler)
 	http.HandleFunc("/api/messages", ApiMessagesHandler)
 
-	http.ListenAndServe(":8000", nil)
+	http.ListenAndServe("localhost:8000", nil)
 }
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {

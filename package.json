@@ -28,9 +28,9 @@
     "test:e2e": "npm run test:okta-hosted-login && npm run test:custom-login",
     "setup-env": "node scripts/setup-env.js",
     "okta-hosted-login-server": "cd okta-hosted-login && go run main.go",
-    "test:okta-hosted-login": "cd resource-server && go get && cd ../ && npm run setup-env && protractor okta-oidc-tck/e2e-tests/okta-hosted-login/conf.js",
+    "test:okta-hosted-login": "cd okta-hosted-login && go get && cd ../ && npm run setup-env && protractor okta-oidc-tck/e2e-tests/okta-hosted-login/conf.js",
     "custom-login-server": "cd custom-login && go run main.go",
-    "test:custom-login": "cd resource-server && go get && cd ../ && npm run setup-env && protractor okta-oidc-tck/e2e-tests/custom-login/conf.js",
+    "test:custom-login": "cd custom-login && go get && cd ../ && npm run setup-env && protractor okta-oidc-tck/e2e-tests/custom-login/conf.js",
     "resource-server": "cd resource-server && go run main.go",
     "test:resource-server": "cd resource-server && go get && cd ../ && npm run setup-env && jasmine okta-oidc-tck/resource-server/specs/okta-resource-server-spec.js",
     "pretest": "webdriver-manager update --gecko false"
