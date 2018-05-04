@@ -34,7 +34,7 @@ func main() {
 	http.HandleFunc("/profile", ProfileHandler)
 	http.HandleFunc("/logout", LogoutHandler)
 
-	http.ListenAndServe(":8080", nil)
+	http.ListenAndServe("localhost:8080", nil)
 }
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
