@@ -17,3 +17,10 @@ install:
 
 script:
   - npm test
+
+addons:
+  apt:
+    sources:
+    - google-chrome
+    packages:
+    - google-chrome-stable
