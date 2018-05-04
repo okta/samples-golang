@@ -9,9 +9,6 @@ matrix:
   allow_failures:
     - go: tip
 
-before_install:
-  - sudo apt-get install -y nodejs
-
 install:
   - npm install
 
@@ -20,7 +17,6 @@ script:
 
 addons:
   apt:
-    sources:
-    - google-chrome
     packages:
     - google-chrome-stable
+    - nodejs
