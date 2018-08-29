@@ -109,7 +109,7 @@ func AuthCodeCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		session.Save(r, w)
 	}
 
-	http.Redirect(w, r, "/", http.StatusMovedPermanently)
+	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 }
 
 func ProfileHandler(w http.ResponseWriter, r *http.Request) {
@@ -136,7 +136,7 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 
 	session.Save(r, w)
 
-	http.Redirect(w, r, "/", http.StatusMovedPermanently)
+	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 }
 
 func exchangeCode(code string, r *http.Request) Exchange {
