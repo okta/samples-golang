@@ -21,7 +21,7 @@ A typical resource-server requires a frontend and a backend application, so you 
 To run this application, you first need to clone this repo and then enter into this directory:
 
 ```bash
-git clone git@github.com:okta/samples-golang.git
+git clone https://github.com/okta/samples-golang.git
 cd samples-golang/resource-server
 ```
 
