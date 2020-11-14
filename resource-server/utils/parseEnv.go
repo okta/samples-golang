@@ -1,9 +1,9 @@
 package utils
 
 import (
-	"os"
-	"log"
 	"bufio"
+	"log"
+	"os"
 	"strings"
 )
 

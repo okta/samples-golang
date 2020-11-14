@@ -5,14 +5,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/sessions"
-	verifier "github.com/okta/okta-jwt-verifier-golang"
-	oktaUtils "github.com/okta/samples-golang/custom-login/utils"
 	"html/template"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
+
+	"github.com/gorilla/sessions"
+	verifier "github.com/okta/okta-jwt-verifier-golang"
+	oktaUtils "github.com/okta/samples-golang/custom-login/utils"
 )
 
 var tpl *template.Template
