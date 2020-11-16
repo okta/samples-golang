@@ -3,11 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	verifier "github.com/okta/okta-jwt-verifier-golang"
-	oktaUtils "github.com/okta/samples-golang/resource-server/utils"
 	"net/http"
 	"os"
 	"strings"
+
+	verifier "github.com/okta/okta-jwt-verifier-golang"
+	oktaUtils "github.com/okta/samples-golang/resource-server/utils"
 )
 
 func main() {
