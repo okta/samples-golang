@@ -1,11 +1,11 @@
 {{template "header" .}}
 
 
-<div id="content" class="container">
+<div id="content" class="ui text container">
   <h2>Okta Hosted Login + Golang Example</h2>
 
 {{if .IsAuthenticated}}
-  <div class="text container">
+  <div>
     <p>Welcome back, <span>{{.Profile.name}}</span>!</p>
     <p>You have successfully authenticated against your Okta org, and have been redirected back to this application.</p>
     <p>Visit the <a href="profile">My Profile</a> page in this application to view the information
