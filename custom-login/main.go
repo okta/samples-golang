@@ -57,6 +57,8 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Cache-Control", "no-cache") // See https://github.com/okta/samples-golang/issues/20
+
 	nonce, _ = oktaUtils.GenerateNonce()
 	type customData struct {
 		Profile         map[string]string
