@@ -42,7 +42,7 @@ function updateConfig(directory) {
 
   let result = data.replace(/CLIENT_ID=/g, `CLIENT_ID=${clientId}`);
   result = result.replace(/CLIENT_SECRET=/g, `CLIENT_SECRET=${process.env.CLIENT_SECRET}`);
-  result = result.replace(/ISSUER=https:\/\/{yourOktaDomain}.com\/oauth2\/default/g, `ISSUER=${process.env.ISSUER}/`);
+  result = result.replace(/ISSUER=https:\/\/{yourOktaDomain}\/oauth2\/default/g, `ISSUER=${process.env.ISSUER}/`);
   fs.writeFileSync(envFile, result, 'utf8');
 }
 

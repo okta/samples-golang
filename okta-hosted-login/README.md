@@ -31,9 +31,9 @@ You also need to gather the following information from the Okta Developer Consol
 Now that you have the information from your organization that you need, copy the [`.env.dist`](.env.dist) to `.env` and fill in the information you gathered.
 
 ```bash
-CLIENT_ID={yourClientId}
-CLIENT_SECRET={yourClientSecret}
-ISSUER=https://{yourOktaDomain}.com/oauth2/default
+CLIENT_ID={clientId}
+CLIENT_SECRET={clientSecret}
+ISSUER=https://{yourOktaDomain}/oauth2/default
 ```
 
 Now start the app server:
