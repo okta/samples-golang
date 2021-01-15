@@ -35,6 +35,7 @@ func main() {
 	http.HandleFunc("/profile", ProfileHandler)
 	http.HandleFunc("/logout", LogoutHandler)
 
+	log.Print("server starting at localhost:8080 ... ")
 	err := http.ListenAndServe("localhost:8080", nil)
 	if err != nil {
 		log.Printf("the HTTP server failed to start: %s", err)
