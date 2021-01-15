@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -17,7 +18,11 @@ func main() {
 	http.HandleFunc("/", HomeHandler)
 	http.HandleFunc("/api/messages", ApiMessagesHandler)
 
-	http.ListenAndServe("localhost:8000", nil)
+	err := http.ListenAndServe("localhost:8000", nil)
+	if err != nil {
+		log.Printf("the HTTP server failed to start: %s", err)
+		os.Exit(1)
+	}
 }
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -35,7 +36,11 @@ func main() {
 	http.HandleFunc("/profile", ProfileHandler)
 	http.HandleFunc("/logout", LogoutHandler)
 
-	http.ListenAndServe("localhost:8080", nil)
+	err := http.ListenAndServe("localhost:8080", nil)
+	if err != nil {
+		log.Printf("the HTTP server failed to start: %s", err)
+		os.Exit(1)
+	}
 }
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
