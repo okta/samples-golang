@@ -18,6 +18,7 @@ func main() {
 	http.HandleFunc("/", HomeHandler)
 	http.HandleFunc("/api/messages", ApiMessagesHandler)
 
+	log.Print("server starting at localhost:8000 ... ")
 	err := http.ListenAndServe("localhost:8000", nil)
 	if err != nil {
 		log.Printf("the HTTP server failed to start: %s", err)
