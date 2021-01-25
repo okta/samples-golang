@@ -11,8 +11,9 @@
     responseType: 'code',
     state: "{{ .State }}" || false,
     display: 'page',
-    scope: ['openid', 'profile', 'email'],
+    scopes: ['openid', 'profile', 'email'],
     nonce: '{{ .Nonce }}',
+    pkce: false,
   };
   new OktaSignIn(config).renderEl(
     { el: '#sign-in-widget' },
