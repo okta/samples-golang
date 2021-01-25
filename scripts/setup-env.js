@@ -22,8 +22,8 @@ const path = require('path');
 require('dotenv').config({path: path.join(__dirname, '..', 'testenv')});
 
 function updateConfig(directory) {
-  if (!process.env.ISSUER || !process.env.CLIENT_ID || !process.env.CLIENT_SECRET || !process.env.USERNAME || !process.env.PASSWORD) {
-    console.log('[ERROR] Please set the necessary Environment variables (ISSUER, CLIENT_ID, CLIENT_SECRET, USERNAME, PASSWORD)');
+  if (!process.env.ISSUER || !process.env.CLIENT_ID || !process.env.CLIENT_SECRET || !process.env.USER_NAME || !process.env.PASSWORD) {
+    console.log('[ERROR] Please set the necessary Environment variables (ISSUER, CLIENT_ID, CLIENT_SECRET, USER_NAME, PASSWORD)');
     process.exit(1);
   }
 
