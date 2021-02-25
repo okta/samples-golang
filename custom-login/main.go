@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -12,14 +13,13 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/gorilla/sessions"
 	verifier "github.com/okta/okta-jwt-verifier-golang"
 	oktaUtils "github.com/okta/samples-golang/custom-login/utils"
 )
 
 var tpl *template.Template
-var sessionStore = sessions.NewCookieStore([]byte("okta-custom-login-session-store"))
-var state = "ApplicationState"
+const SessionName = "okta-custom-login-session-store"
+var sessionStore = oktaUtils.InitStore()
 var nonce = "NonceNotSetYet"
 
 func init() {
@@ -73,7 +73,9 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	issuerParts, _ := url.Parse(os.Getenv("ISSUER"))
 	baseUrl := issuerParts.Scheme + "://" + issuerParts.Hostname()
-
+	session := oktaUtils.GetSession(w, r, SessionName)
+	sha256 := sha256.Sum256([]byte(session.ID))
+	state := fmt.Sprintf("%x\n", sha256)
 	data := customData{
 		Profile:         getProfileData(r),
 		IsAuthenticated: isAuthenticated(r),
@@ -83,12 +85,15 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		State:           state,
 		Nonce:           nonce,
 	}
+	session.Values["state"] = state
+	session.Save(r, w)
 	tpl.ExecuteTemplate(w, "login.gohtml", data)
 }
 
 func AuthCodeCallbackHandler(w http.ResponseWriter, r *http.Request) {
+	session := oktaUtils.GetSession(w, r, SessionName)
 	// Check the state that was returned in the query string is the same as the above state
-	if r.URL.Query().Get("state") != state {
+	if r.URL.Query().Get("state") != session.Values["state"] {
 		fmt.Fprintln(w, "The state was not as expected")
 		return
 	}
