@@ -1,0 +1,31 @@
+{{template "header" .}}
+
+<div id="content" class="ui text container">
+  <h2>Okta IdX Reset Password</h2>
+  <h2></h2>
+  {{if .IsAuthenticated}}
+  <div>
+    <p>Welcome back, <span>{{.Profile.name}}</span>!</p>
+    <p>You have successfully authenticated against your Okta org, and have been redirected back to this application.</p>
+    <p>Visit the <a href="/profile">My Profile</a> page in this application to view the information
+      retrieved with your OAuth Access Token.</p>
+  </div>
+  {{else if .IsNewAccount}}
+    {{template "new_account" .}}
+  {{else if .IsResetPassword}}
+    {{template "reset_password" .}}
+  {{else}}
+  <div>
+    <p>Hello!</p>
+    <p>If you're viewing this page then you have successfully configured and started this example server.</p>
+    <p>You are not yet authenticated, however you can reset password or create a new account</p>
+  </div>
+  <form action="/password/reset">
+    <input type="submit" value="Reset Password" />
+  </form>
+  <form action="/account/new">
+    <input type="submit" value="Sign Up" />
+  </form>
+  {{end}}
+</div>
+{{template "footer"}}

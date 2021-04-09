@@ -1,0 +1,46 @@
+{{define "new_account"}}
+    <div>
+        <p>Hello!</p>
+        <p>This example shows how to create a new account</p>
+    </div>
+    {{if .IsInitialAccountCreate}}
+        <div>
+            <p>Please enter your first name, last name and email address</p>
+        </div>
+        <div>
+            <form method="post" action="/account/new/name">
+                <div>
+                    <label for="first_name">User name</label>
+                    <input type="text" id="first_name" name="first_name">
+                </div>
+                <div>
+                    <label for="last_name">Last name</label>
+                    <input type="text" id="last_name" name="last_name">
+                </div>
+                <div>
+                    <label for="email">Email</label>
+                    <input type="text" id="email" name="email">
+                </div>
+                <button type="submit">Submit</button>
+            </form>
+        </div>
+    {{else if .IsWaitingForEmail}}
+        <div>
+            <p>Please enter verification code that you should receive shortly after submitting account details</p>
+        </div>
+        <form method="post" action="/account/new/email">
+            <label for="code">Verification code from email</label>
+            <input type="text" id="code" name="code">
+            <button type="submit">Submit code</button>
+        </form>
+    {{else if .IsNewPassword}}
+        <div>
+            <p>Please enter new password for your account</p>
+        </div>
+        <form method="post" action="/account/new/passcode">
+            <label for="password">Enter new password</label>
+            <input type="password" id="password" name="password">
+            <button type="submit">Submit New Password</button>
+        </form>
+    {{end}}
+{{end}}

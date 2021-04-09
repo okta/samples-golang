@@ -4,3 +4,5 @@ okta-oidc-tck
 node_modules
 testenv
 .idea
+/idx-sample/vendor/
+vendor
