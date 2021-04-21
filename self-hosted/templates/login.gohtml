@@ -1,0 +1,29 @@
+{{template "header" .}}
+
+<div id="okta-signin-widget-container"></div>
+<script type="text/javascript">
+  var config = {};
+  config.baseUrl = "{{ .BaseUrl }}";
+  config.clientId = "{{ .ClientId }}";
+  config.redirectUri = "http://localhost:8080/login/callback";
+  config.interactionHandle = "{{ .InteractionHandle }}";
+  config.useInteractionCodeFlow = "true";
+  config.codeChallenge = "{{ .Pkce.CodeChallenge }}";
+  config.codeChallengeMethod = "{{ .Pkce.CodeChallengeMethod }}";
+  config.state = "{{ .State }}" || false,
+  config.debug = true,
+  config.authParams = {
+    issuer: "{{ .Issuer }}",
+    scopes: ['openid', 'profile', 'email'],
+  };
+  const signIn = new OktaSignIn({
+    el: '#okta-signin-widget-container',
+    ...config
+  });
+  signIn.showSignInAndRedirect()
+    .catch(err => {
+      console.log('Error happen in showSignInAndRedirect: ', err);
+    });
+</script>
+
+{{template "footer"}}
