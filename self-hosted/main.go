@@ -64,6 +64,8 @@ func init() {
 	}
 
 }
+
+// Creates a codeVerifier that is used for PKCE
 func createCodeVerifier() (*string, error) {
 	codeVerifier := make([]byte, 86)
 	_, err := rand.Read(codeVerifier)
@@ -75,6 +77,9 @@ func createCodeVerifier() (*string, error) {
 	return &s, nil
 }
 
+// Create the PKCE data for the authentication flow.
+// This data will be used when getting an interaction
+// handle as well as when you exchange your tokens.
 func createPKCEData() (*PKCE, error) {
 	h := sha256.New()
 
@@ -210,7 +215,6 @@ func LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	//log.Printf("%+v\n", session.Values)
 	if session.Values["pkce_code_verifier"] == nil ||
 		session.Values["pkce_code_verifier"] == "" ||
 		session.Values["pkce_code_challenge"] == nil ||
@@ -396,6 +400,7 @@ func ReadConfig(c *config, opts ...viper.DecoderConfigOption) error {
 	return nil
 }
 
+// Generate a Nonce to be used during the initialization of the SIW
 func generateNonce() (string, error) {
 	nonceBytes := make([]byte, 32)
 	_, err := rand.Read(nonceBytes)
@@ -406,32 +411,7 @@ func generateNonce() (string, error) {
 	return base64.URLEncoding.EncodeToString(nonceBytes), nil
 }
 
-func printcURL(req *http.Request) error {
-	var (
-		command string
-		b       []byte
-		err     error
-	)
-	if req.URL != nil {
-		command = fmt.Sprintf("curl -X %s '%s'", req.Method, req.URL.String())
-	}
-	for k, v := range req.Header {
-		command += fmt.Sprintf(" -H '%s: %s'", k, strings.Join(v, ", "))
-	}
-	if req.Body != nil {
-		b, err = ioutil.ReadAll(req.Body)
-		if err != nil {
-			return err
-		}
-		command += fmt.Sprintf(" -d %q", string(b))
-	}
-	fmt.Fprintf(os.Stderr, "cURL Command: %s\n", command)
-	// reset body
-	body := bytes.NewBuffer(b)
-	req.Body = ioutil.NopCloser(body)
-	return nil
-}
-
+// Check to see if a user is authenticated based on id_token
 func isAuthenticated(r *http.Request) bool {
 	session, err := sessionStore.Get(r, sessionStoreName)
 
@@ -442,6 +422,8 @@ func isAuthenticated(r *http.Request) bool {
 	return true
 }
 
+// Get the interaction handle to begin the flow. Use this
+// value when initializing the Okta sign in widget.
 func getInteractionHandle(codeChallenge string) (string, error) {
 	data := url.Values{}
 	data.Set("client_id", cfg.Okta.IDX.ClientID)
