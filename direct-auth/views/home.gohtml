@@ -1,0 +1,36 @@
+{{template "_head" .}}
+
+    <!-- CONTENT -->
+    <main class="-mt-24 pb-8">
+      <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:max-w-7xl lg:px-8">
+        <div class="grid grid-cols-1 gap-4 items-start lg:grid-cols-3 lg:gap-8">
+          <div class="grid grid-cols-1 gap-4 lg:col-span-2">
+            <section>
+              <div class="rounded-lg bg-white overflow-hidden shadow">
+                <div class="p-6">
+                  <h1 class="text-4xl">Okta + Golang: Direct Auth</h1>
+                  {{if not .Authenticated}}
+                  <p>Hello!</p>
+                  <p>If you're viewing this page then you have successfully configured this example server.  Your server configuration is listed on the right.</p>
+                  <p>
+                    This example shows you how to use the <code>Direct Auth</code> convenience methods from <a href="https://github.com/okta/okta-auth-js">Okta Auth JS SDK</a> to implement <code>Direct Auth</code> flows.
+                  </p>
+
+
+                  <div class="py-8">
+                  {{template "_flows" .}}
+                  </div>
+                  {{end}}
+                </div>
+              </div>
+            </section>
+          </div>
+
+          {{template "_serverConfig"}}
+
+        </div>
+      </div>
+    </main>
+    <!-- END CONTENT -->
+
+{{template "_footer"}}
