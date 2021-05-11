@@ -1,0 +1,82 @@
+{{define "_serverConfig"}}
+<!-- SERVER CONFIG -->
+<div class="grid grid-cols-1 gap-4">
+  <section aria-labelledby="section-2-title">
+    <h2 class="sr-only" id="section-2-title">App Configuration</h2>
+    <div class="rounded-lg bg-white overflow-hidden shadow">
+      <div class="p-6">
+        <h3>Server Configuration</h3>
+        <p>This server has been configured with the following settings:</p>
+        <div class="flex flex-col">
+          <div class="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+            <div class="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
+              <div class="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Setting
+                      </th>
+                      <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Value
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+
+                    <tr class="bg-white">
+                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        Issuer
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{configOption "Issuer"}}
+                      </td>
+                    </tr>
+
+                    <tr class="bg-gray-50">
+                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        Client ID
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{configOption "ClientID"}}
+                      </td>
+                    </tr>
+
+                    <tr class="bg-white">
+                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        Client Secret
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{configOption "ClientSecret"}}
+                      </td>
+                    </tr>
+
+                    <tr class="bg-gray-50">
+                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        Redirect URI
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{configOption "RedirectURI"}}
+                      </td>
+                    </tr>
+
+                    <tr class="bg-white">
+                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        Scopes
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{configOption "Scopes"}}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+<!-- END SERVER CONFIG -->
+{{end}}
