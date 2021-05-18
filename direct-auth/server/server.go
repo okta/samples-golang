@@ -34,6 +34,7 @@ import (
 	idx "github.com/okta/okta-idx-golang"
 	"github.com/okta/samples-golang/direct-auth/config"
 	"github.com/okta/samples-golang/direct-auth/views"
+	"github.com/patrickmn/go-cache"
 )
 
 type Server struct {
@@ -43,6 +44,7 @@ type Server struct {
 	session   *sessions.CookieStore
 	view      *views.ViewConfig
 	ViewData  ViewData
+	cache     *cache.Cache
 }
 
 type ViewData map[string]interface{}
@@ -61,6 +63,7 @@ func NewServer(c *config.Config) *Server {
 		config:    c,
 		idxClient: idx,
 		session:   sessionStore,
+		cache:     cache.New(5*time.Minute, 10*time.Minute),
 		ViewData: map[string]interface{}{
 			"Authenticated": false,
 			"Errors":        "",
@@ -85,8 +88,16 @@ func (s *Server) Run() {
 	r := mux.NewRouter()
 
 	// Username/Password Login
-	r.HandleFunc("/login/primary", s.loginPrimary).Methods("GET")
-	r.HandleFunc("/login/primary", s.handlePrimaryLogin).Methods("POST")
+	r.HandleFunc("/basic-login", s.loginPrimary).Methods("GET")
+	r.HandleFunc("/basic-login", s.handlePrimaryLogin).Methods("POST")
+
+	// Reset Password
+	r.HandleFunc("/reset-pw", s.passwordReset).Methods("GET")
+	r.HandleFunc("/reset-pw", s.handlePasswordReset).Methods("POST")
+	r.HandleFunc("/reset-pw/code", s.passwordResetCode).Methods("GET")
+	r.HandleFunc("/reset-pw/code", s.handlePasswordResetCode).Methods("POST")
+	r.HandleFunc("/reset-pw/newPassword", s.passwordResetNewPassword).Methods("GET")
+	r.HandleFunc("/reset-pw/newPassword", s.handlePasswordResetNewPassword).Methods("POST")
 
 	// General Pages
 	r.HandleFunc("/", s.home)
@@ -123,12 +134,20 @@ func (s *Server) loginPrimary(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePrimaryLogin(w http.ResponseWriter, r *http.Request) {
+	// Begin the login flow with the IDX Client
 	lr, err := s.idxClient.InitLogin(context.TODO())
-	session, err := sessionStore.Get(r, "direct-auth")
 	if err != nil {
 		log.Fatalf("Could not initalize login: %s", err.Error())
 	}
 
+	// Get session store so we can store our tokens
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+
+	// PUll data from the web form and create your identify request
+	// THis is used in the Identify step
 	ir := &idx.IdentifyRequest{
 		Identifier: r.FormValue("identifier"),
 		Credentials: idx.Credentials{
@@ -136,22 +155,20 @@ func (s *Server) handlePrimaryLogin(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	// call identify with the identify request to start your login
 	lr, err = lr.Identify(context.TODO(), ir)
+	// If we error, there was something wrong returned from server
+	// set this in the error array for session and redirect back to the login screen
 	if err != nil {
 		fmt.Printf("Identify Request Failure: %s", err.Error())
 		session.Values["Errors"] = err.Error()
 		session.Save(r, w)
-		http.Redirect(w, r, "/login/primary", http.StatusFound)
+		http.Redirect(w, r, "/basic-login", http.StatusFound)
 		return
 	}
 
-	fmt.Printf("%+v\n", lr.Token() != nil)
-
+	// If we have tokens we have success, so lets store tokens
 	if lr.Token() != nil {
-
-		if err != nil {
-			log.Fatalf("could not get store: %s", err)
-		}
 		session.Values["access_token"] = lr.Token().AccessToken
 		session.Values["id_token"] = lr.Token().IDToken
 		err = session.Save(r, w)
@@ -160,13 +177,152 @@ func (s *Server) handlePrimaryLogin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	fmt.Printf("%+v\n", lr.Token())
-
-	http.Redirect(w, r, "/", http.StatusFound)
-
+	// redirect the user to /profile
+	http.Redirect(w, r, "/profile", http.StatusFound)
 }
 
 // END: Username/Password Login
+
+// BEGIN: Self Service Password Recovery
+func (s *Server) passwordReset(w http.ResponseWriter, r *http.Request) {
+	s.render("resetPassword.gohtml", w, r)
+}
+
+func (s *Server) handlePasswordReset(w http.ResponseWriter, r *http.Request) {
+	// Get session store so we can store our tokens
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+
+	ir := &idx.IdentifyRequest{
+		Identifier: r.FormValue("identifier"),
+	}
+
+	rpr, err := s.idxClient.InitPasswordReset(context.TODO(), ir)
+
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/reset-pw", http.StatusFound)
+		return
+	}
+
+	// At this point, we expect to have sent an email
+	// for a password reset, so we need to accept the code
+	// that was sent to the email address. If step does
+	// not exist, we encountered an error.
+	if !rpr.HasStep(idx.ResetPasswordStepEmailConfirmation) {
+		session.Values["Errors"] = "We encountered an unexpected error, please try again"
+		session.Save(r, w)
+		http.Redirect(w, r, "/reset-pw", http.StatusFound)
+		return
+	}
+
+	s.cache.Set("resetPasswordFlow", rpr, time.Minute*5)
+
+	http.Redirect(w, r, "/reset-pw/code", http.StatusFound)
+	return
+}
+
+func (s *Server) passwordResetCode(w http.ResponseWriter, r *http.Request) {
+	s.render("resetPasswordCode.gohtml", w, r)
+}
+
+func (s *Server) handlePasswordResetCode(w http.ResponseWriter, r *http.Request) {
+	tmp, _ := s.cache.Get("resetPasswordFlow")
+	rpr := tmp.(*idx.ResetPasswordResponse)
+
+	// Get session store so we can store our tokens
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+
+	rpr, err = rpr.ConfirmEmail(context.TODO(), r.FormValue("code"))
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/reset-pw/code", http.StatusFound)
+		return
+	}
+
+	if !rpr.HasStep(idx.ResetPasswordStepNewPassword) {
+		rpr.Cancel(context.TODO())
+		session.Values["Errors"] = "We encountered an unexpected error, please try again"
+		session.Save(r, w)
+		http.Redirect(w, r, "/reset-pw", http.StatusFound)
+		return
+	}
+
+	s.cache.Set("resetPasswordFlow", rpr, time.Minute*5)
+
+	http.Redirect(w, r, "/reset-pw/newPassword", http.StatusFound)
+	return
+
+}
+
+func (s *Server) passwordResetNewPassword(w http.ResponseWriter, r *http.Request) {
+	s.render("resetPasswordNewPassword.gohtml", w, r)
+}
+
+func (s *Server) handlePasswordResetNewPassword(w http.ResponseWriter, r *http.Request) {
+	// Get session store so we can store our tokens
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+
+	newPassword := r.FormValue("newPassword")
+	confirmPassword := r.FormValue("confirmPassword")
+
+	if newPassword != confirmPassword {
+		session.Values["Errors"] = "Passwords do not match"
+		session.Save(r, w)
+		http.Redirect(w, r, "/reset-pw/newPassword", http.StatusFound)
+		return
+	}
+
+	tmp, _ := s.cache.Get("resetPasswordFlow")
+	rpr := tmp.(*idx.ResetPasswordResponse)
+
+	rpr, err = rpr.SetNewPassword(context.TODO(), newPassword)
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/reset-pw/newPassword", http.StatusFound)
+		return
+	}
+
+	if !rpr.HasStep(idx.ResetPasswordStepSuccess) {
+		rpr.Cancel(context.TODO())
+		session.Values["Errors"] = "This sample does not support this use case, please review your policy setup and try again."
+		session.Save(r, w)
+		http.Redirect(w, r, "/reset-pw", http.StatusFound)
+		return
+	}
+
+	// If we have tokens we have success, so lets store tokens
+	if rpr.Token() != nil {
+		session.Values["access_token"] = rpr.Token().AccessToken
+		session.Values["id_token"] = rpr.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+	} else {
+		session.Values["Errors"] = "This sample does not support this use case, please review your policy setup and try again."
+		session.Save(r, w)
+		http.Redirect(w, r, "/reset-pw", http.StatusFound)
+		return
+	}
+
+	// redirect the user to /profile
+	http.Redirect(w, r, "/profile", http.StatusFound)
+	return
+}
+
+// END: Self Service Password Recovery
 
 func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	s.render("home.gohtml", w, r)
