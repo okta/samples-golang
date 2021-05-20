@@ -87,6 +87,8 @@ func (s *Server) Run() {
 
 	r := mux.NewRouter()
 
+	r.HandleFunc("/showView/{view}", s.showView).Methods("GET")
+
 	// Username/Password Login
 	r.HandleFunc("/basic-login", s.loginPrimary).Methods("GET")
 	r.HandleFunc("/basic-login", s.handlePrimaryLogin).Methods("POST")
@@ -426,4 +428,10 @@ func (s *Server) getProfileData(r *http.Request) map[string]string {
 	json.Unmarshal(body, &m)
 
 	return m
+}
+
+func (s *Server) showView(w http.ResponseWriter, r *http.Request) {
+	view := mux.Vars(r)["view"]
+
+	s.render(fmt.Sprintf("%s.gohtml", view), w, r)
 }
