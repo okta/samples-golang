@@ -25,6 +25,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"path"
 	"strings"
 	"time"
@@ -84,6 +85,7 @@ func (s *Server) Run() {
 	go s.watchForTemplates()
 
 	r := mux.NewRouter()
+	r.Use(loggingMiddleware)
 
 	r.HandleFunc("/showView/{view}", s.showView).Methods("GET")
 
@@ -139,14 +141,25 @@ func (s *Server) Run() {
 		s.render("profile.gohtml", w, r)
 	}).Methods("GET")
 
+	addr := "127.0.0.1:8000"
+	logger := log.New(os.Stderr, "http: ", log.LstdFlags)
 	srv := &http.Server{
 		Handler:      r,
-		Addr:         "127.0.0.1:8000",
-		WriteTimeout: 60 * time.Second,
-		ReadTimeout:  60 * time.Second,
+		Addr:         addr,
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+		ErrorLog:     logger,
 	}
 
+	log.Printf("running sample on addr %q\n", addr)
 	log.Fatal(srv.ListenAndServe())
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("%s: %s\n", r.Method, r.RequestURI)
+		next.ServeHTTP(w, r)
+	})
 }
 
 // BEGIN: Login
