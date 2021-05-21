@@ -139,6 +139,8 @@ github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRW
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
 github.com/okta/okta-idx-golang v0.0.0-20210518151018-d6ab35efb074 h1:2JCzxgbPkXoWsQaNZQSg9YmNXgbkS6tYj+It4FwhMjI=
 github.com/okta/okta-idx-golang v0.0.0-20210518151018-d6ab35efb074/go.mod h1:h+cnPj4zH6JpdNv2+llAvTKNA3UL8ySofhJ9QVT6xoc=
+github.com/okta/okta-idx-golang v0.0.0-20210521160048-e6ff17ca304d h1:Ls4o1YLsAB+9RU/oBWJUOB+WsceGt1jnaMMm1qV9tio=
+github.com/okta/okta-idx-golang v0.0.0-20210521160048-e6ff17ca304d/go.mod h1:h+cnPj4zH6JpdNv2+llAvTKNA3UL8ySofhJ9QVT6xoc=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/patrickmn/go-cache v2.1.0+incompatible h1:HRMgzkcYKYpi3C8ajMPV8OFXaaRUnok+kx1WdO15EQc=
 github.com/patrickmn/go-cache v2.1.0+incompatible/go.mod h1:3Qf8kWWT7OJRJbdiICTKqZju1ZixQ/KpMGzzAfe6+WQ=
