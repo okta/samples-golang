@@ -18,3 +18,11 @@ Run the application with the go run command.
 ```
 go run main.go
 ```
+
+## BDD / Cucumber
+
+The Gherkin format scenarios in `features/` can be run with [godog](https://github.com/cucumber/godog)
+
+```
+godog run
+```
