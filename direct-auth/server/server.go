@@ -26,6 +26,7 @@ import (
 	"log"
 	"net/http"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -89,9 +90,10 @@ func (s *Server) Run() {
 
 	r.HandleFunc("/showView/{view}", s.showView).Methods("GET")
 
-	// Username/Password Login
 	r.HandleFunc("/login", s.login).Methods("GET")
 	r.HandleFunc("/login", s.handleLogin).Methods("POST")
+
+	r.HandleFunc("/login/callback", s.handleLoginCallback).Methods("GET")
 
 	// // Reset Password
 	// r.HandleFunc("/reset-pw", s.passwordReset).Methods("GET")
@@ -202,6 +204,54 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+func (s *Server) handleLoginCallback(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	s.cache.Delete("loginResponse")
+	lr := clr.(*idx.LoginResponse)
+
+	//Get session store so we can store our tokens
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+
+	lr, err = lr.WhereAmI(context.TODO())
+	if err != nil {
+		log.Fatalf("could not tell where I am: %s", err)
+	}
+
+	if !lr.HasStep(idx.LoginStepSuccess) {
+		var steps []string
+		for _, step := range lr.AvailableSteps() {
+			steps = append(steps, step.String())
+		}
+		fmt.Printf("Non Success after IDP Redirect not supported. Available steps: %s", strings.Join(steps, ","))
+		session.Values["Errors"] = "Multifactor Authentication and Social Identity Providers is not currently supported, Authentication failed."
+		session.Save(r, w)
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+
+	// If we have tokens we have success, so lets store tokens
+	if lr.Token() != nil {
+		session.Values["access_token"] = lr.Token().AccessToken
+		session.Values["id_token"] = lr.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+	} else {
+		session.Values["Errors"] = "We expected tokens to be available here but were not. Authentication Failed."
+		session.Save(r, w)
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+
+	// redirect the user to /profile
+	http.Redirect(w, r, "/", http.StatusFound)
+
 }
 
 // func (s *Server) handlePrimaryLogin(w http.ResponseWriter, r *http.Request) {
