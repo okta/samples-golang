@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -92,6 +93,9 @@ func (s *Server) Run() {
 
 	r.HandleFunc("/login", s.login).Methods("GET")
 	r.HandleFunc("/login", s.handleLogin).Methods("POST")
+	r.HandleFunc("/login/options", s.handleLoginOptions).Methods("GET")
+	r.HandleFunc("/login/email", s.handleLoginEmailVerification).Methods("GET")
+	r.HandleFunc("/login/email", s.handleLoginEmailConfirmation).Methods("POST")
 
 	r.HandleFunc("/login/callback", s.handleLoginCallback).Methods("GET")
 
@@ -183,16 +187,6 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If we error, there was something wrong returned from server
-	// set this in the error array for session and redirect back to the login screen
-	if err != nil {
-		fmt.Printf("Identify Request Failure: %s", err.Error())
-		session.Values["Errors"] = err.Error()
-		session.Save(r, w)
-		http.Redirect(w, r, "/login", http.StatusFound)
-		return
-	}
-
 	// If we have tokens we have success, so lets store tokens
 	if lr.Token() != nil {
 		session.Values["access_token"] = lr.Token().AccessToken
@@ -201,9 +195,83 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Fatalf("could not save access token: %s", err)
 		}
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
 	}
 
+	s.cache.Set("loginResponse", lr, time.Minute*5)
+	http.Redirect(w, r, "/login/options", http.StatusFound)
+	return
+}
+
+func (s *Server) handleLoginEmailVerification(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	lr := clr.(*idx.LoginResponse)
+	if !lr.HasStep(idx.LoginStepEmailVerification) {
+		http.Redirect(w, r, "login/options", http.StatusFound)
+		return
+	}
+	invCode, ok := s.ViewData["InvalidEmailCode"]
+	if !ok || !invCode.(bool) {
+		lr, err := lr.VerifyEmail(r.Context())
+		if err != nil {
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
+		s.cache.Set("loginResponse", lr, time.Minute*5)
+	}
+
+	s.render("loginEmail.gohtml", w, r)
+}
+
+func (s *Server) handleLoginEmailConfirmation(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	lr := clr.(*idx.LoginResponse)
+	if !lr.HasStep(idx.LoginStepEmailConfirmation) {
+		http.Redirect(w, r, "login/options", http.StatusFound)
+		return
+	}
+	lr, err := lr.ConfirmEmail(r.Context(),  r.FormValue("code"))
+	if err != nil {
+		var idxErr *idx.ErrorResponse
+		if errors.As(err, &idxErr) {
+			for _, v := range idxErr.Message.Values {
+				if strings.Contains(v.Message, "Invalid") {
+					s.ViewData["InvalidEmailCode"] = true
+				}
+			}
+		}
+		http.Redirect(w, r, "/login/email", http.StatusFound)
+		return
+	}
+	s.cache.Set("loginResponse", lr, time.Minute*5)
+	s.ViewData["InvalidEmailCode"] = false
+
+	// If we have tokens we have success, so lets store tokens
+	if lr.Token() != nil {
+		session, err := sessionStore.Get(r, "direct-auth")
+		if err != nil {
+			log.Fatalf("could not get store: %s", err)
+		}
+		session.Values["access_token"] = lr.Token().AccessToken
+		session.Values["id_token"] = lr.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+	}
+	// redirect the user to /profile
 	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+func (s *Server) handleLoginOptions(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	lr := clr.(*idx.LoginResponse)
+
+	if lr.HasStep(idx.LoginStepEmailVerification) {
+		s.ViewData["LoginEmail"] = true
+	}
+	s.render("loginOptions.gohtml", w, r)
 }
 
 func (s *Server) handleLoginCallback(w http.ResponseWriter, r *http.Request) {
