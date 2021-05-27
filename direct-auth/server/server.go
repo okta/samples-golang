@@ -103,6 +103,13 @@ func (s *Server) Run() {
 	r.HandleFunc("/register", s.handleRegister).Methods("POST")
 
 	r.HandleFunc("/enrollFactor", s.enrollFactor).Methods("GET")
+	r.HandleFunc("/enrollFactor", s.handleEnrollFactor).Methods("POST")
+	r.HandleFunc("/enrollEmail", s.enrollEmail).Methods("GET")
+	r.HandleFunc("/enrollEmail", s.handleEnrollEmail).Methods("POST")
+	r.HandleFunc("/enrollPhone", s.enrollPhone).Methods("GET")
+	r.HandleFunc("/enrollPhone", s.handleEnrollPhone).Methods("POST")
+	r.HandleFunc("/enrollPassword", s.enrollPassword).Methods("GET")
+	r.HandleFunc("/enrollPassword", s.handleEnrollPassword).Methods("POST")
 
 	r.HandleFunc("/passwordRecovery", s.passwordReset).Methods("GET")
 	r.HandleFunc("/passwordRecovery", s.handlePasswordReset).Methods("POST")
@@ -462,13 +469,11 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-
 	fmt.Printf("%+v\n", enrollResponse)
 }
 
 func (s *Server) enrollFactor(w http.ResponseWriter, r *http.Request) {
 	cer, _ := s.cache.Get("enrollResponse")
-	s.cache.Delete("enrollResponse")
 	enrollResponse := cer.(*idx.EnrollmentResponse)
 
 	if enrollResponse.HasStep(idx.EnrollmentStepSkip) {
@@ -478,6 +483,102 @@ func (s *Server) enrollFactor(w http.ResponseWriter, r *http.Request) {
 	s.ViewData["authenticators"] = enrollResponse.Authenticators().Value
 
 	s.render("enroll.gohtml", w, r)
+}
+
+func (s *Server) handleEnrollFactor(w http.ResponseWriter, r *http.Request) {
+	// Get session store so we can store our tokens
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+
+	switch authenticator := r.FormValue("authenticator"); authenticator {
+	case "Password":
+		http.Redirect(w, r, "/enrollPassword", http.StatusFound)
+		return
+	case "Phone":
+		http.Redirect(w, r, "/enrollPhone", http.StatusFound)
+		return
+	case "Email":
+		http.Redirect(w, r, "/enrollEmail", http.StatusFound)
+		return
+	default:
+		session.Values["Errors"] = "We do not support the authenticator " + authenticator + " in this sample."
+		session.Save(r, w)
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+}
+
+func (s *Server) enrollPassword(w http.ResponseWriter, r *http.Request) {
+	s.render("enrollPassword.gohtml", w, r)
+}
+
+func (s *Server) handleEnrollPassword(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+
+	// Get session store so we can store our tokens
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+
+	newPassword := r.FormValue("newPassword")
+	confirmPassword := r.FormValue("confirmPassword")
+
+	if newPassword != confirmPassword {
+		session.Values["Errors"] = "Passwords do not match"
+		session.Save(r, w)
+		http.Redirect(w, r, "/enrollPassword", http.StatusFound)
+		return
+	}
+
+	enrollResponse, err = enrollResponse.SetNewPassword(context.TODO(), r.FormValue("newPassword"))
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/enrollPassword", http.StatusFound)
+		return
+	}
+
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+
+	if !enrollResponse.HasStep(idx.EnrollmentStepSuccess) {
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+	}
+
+	if enrollResponse.Token() != nil {
+		session.Values["access_token"] = enrollResponse.Token().AccessToken
+		session.Values["id_token"] = enrollResponse.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+	} else {
+		session.Values["Errors"] = "This sample does not support this use case, please review your policy setup and try again."
+		session.Save(r, w)
+		http.Redirect(w, r, "/register", http.StatusFound)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusFound)
+
+}
+
+func (s *Server) enrollPhone(w http.ResponseWriter, r *http.Request) {
+	s.render("enrollPhone.gohtml", w, r)
+}
+
+func (s *Server) handleEnrollPhone(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func (s *Server) enrollEmail(w http.ResponseWriter, r *http.Request) {
+	s.render("enrollEmail.gohtml", w, r)
+}
+
+func (s *Server) handleEnrollEmail(w http.ResponseWriter, r *http.Request) {
+
 }
 
 func (s *Server) passwordReset(w http.ResponseWriter, r *http.Request) {
@@ -572,7 +673,6 @@ func (s *Server) handlePasswordResetCode(w http.ResponseWriter, r *http.Request)
 
 	http.Redirect(w, r, "/passwordRecovery/newPassword", http.StatusFound)
 	return
-
 }
 
 func (s *Server) passwordResetNewPassword(w http.ResponseWriter, r *http.Request) {
@@ -634,8 +734,6 @@ func (s *Server) handlePasswordResetNewPassword(w http.ResponseWriter, r *http.R
 	http.Redirect(w, r, "/", http.StatusFound)
 	return
 }
-
-// END: Self Service Password Recovery
 
 func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	if s.IsAuthenticated(r) {
