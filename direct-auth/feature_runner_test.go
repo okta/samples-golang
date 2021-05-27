@@ -26,15 +26,15 @@ import (
 	"github.com/cucumber/godog"
 	"github.com/cucumber/godog/colors"
 	"github.com/cucumber/messages-go/v10"
-	"github.com/monde/browsersteps"
 	"github.com/okta/samples-golang/direct-auth/config"
 	"github.com/okta/samples-golang/direct-auth/server"
 	"github.com/tebeka/selenium"
 )
 
 type TestHarness struct {
-	bs     *browsersteps.BrowserSteps
-	Server *server.Server
+	server       *server.Server
+	wd           selenium.WebDriver
+	capabilities selenium.Capabilities
 }
 
 func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
@@ -49,25 +49,25 @@ func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 		}
 
 		server := server.NewServer(cfg)
-		th.Server = server
+		th.server = server
 		server.Run()
 	})
 
 	ctx.AfterSuite(func() {
-		if th.Server != nil {
-			th.Server.Stop()
+		if th.server != nil {
+			th.server.Stop()
 		}
 	})
 }
 
 func (th *TestHarness) navigateToTheRootView() error {
-	url := fmt.Sprintf("http://%s/", th.Server.Address())
-	err := th.bs.GetWebDriver().Get(url)
+	rootURL := fmt.Sprintf("http://%s/", th.server.Address())
+	err := th.wd.Get(rootURL)
 	return err
 }
 
 func (th *TestHarness) checkEntryPoints() error {
-	baseURL := fmt.Sprintf("http://%s", th.Server.Address())
+	baseURL := fmt.Sprintf("http://%s", th.server.Address())
 	links := []struct {
 		text string
 		href string
@@ -90,9 +90,8 @@ func (th *TestHarness) checkEntryPoints() error {
 		},
 	}
 
-	wd := th.bs.GetWebDriver()
 	for _, link := range links {
-		elem, err := wd.FindElement(selenium.ByLinkText, link.text)
+		elem, err := th.wd.FindElement(selenium.ByLinkText, link.text)
 		if err != nil {
 			return err
 		}
@@ -122,19 +121,25 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 			log.Panic(err)
 		}
 	}
+	th.capabilities = capabilities
 
-	th.bs = browsersteps.NewBrowserSteps(ctx, capabilities, os.Getenv("SELENIUM_URL"))
-
-	ctx.BeforeScenario(func(sc *messages.Pickle) {})
+	ctx.BeforeScenario(func(sc *messages.Pickle) {
+		var err error
+		th.wd, err = selenium.NewRemote(th.capabilities, os.Getenv("SELENIUM_URL"))
+		if err != nil {
+			log.Panic(err)
+		}
+	})
 
 	ctx.AfterScenario(func(sc *messages.Pickle, err error) {
 		// force a logout and go back to home
-		baseURL := fmt.Sprintf("http://%s/", th.Server.Address())
-		logoutURL := fmt.Sprintf("%s", "logout")
-		wd := th.bs.GetWebDriver()
+		logoutURL := fmt.Sprintf("%s%s", th.server.Address(), "logout")
 		logoutXHR := fmt.Sprintf("var xhr = new XMLHttpRequest();\nxhr.open(\"POST\", %q, false);\nxhr.send('');", logoutURL)
-		_, _ = wd.ExecuteScript(logoutXHR, nil)
-		th.bs.GetWebDriver().Get(baseURL)
+		_, _ = th.wd.ExecuteScript(logoutXHR, nil)
+		err = th.wd.Quit()
+		if err != nil {
+			log.Panic(err)
+		}
 	})
 
 	ctx.Step(`^Mary navigates to the Root View$`, th.navigateToTheRootView)
