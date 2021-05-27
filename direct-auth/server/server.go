@@ -47,6 +47,8 @@ type Server struct {
 	view      *views.ViewConfig
 	ViewData  ViewData
 	cache     *cache.Cache
+	svc       *http.Server
+	address   string
 }
 
 type ViewData map[string]interface{}
@@ -77,6 +79,19 @@ func (s *Server) Config() *config.Config {
 
 func (s *Server) Session() *sessions.CookieStore {
 	return sessionStore
+}
+
+func (s *Server) Stop() {
+	if s.svc != nil {
+		err := s.svc.Shutdown(context.TODO())
+		if err != nil {
+			fmt.Printf("error shutting down server: %+v\n", err)
+		}
+	}
+}
+
+func (s *Server) Address() string {
+	return s.address
 }
 
 func (s *Server) Run() {
@@ -151,8 +166,18 @@ func (s *Server) Run() {
 		ErrorLog:     logger,
 	}
 
+	s.svc = srv
+	s.address = srv.Addr
+
 	log.Printf("running sample on addr %q\n", addr)
-	log.Fatal(srv.ListenAndServe())
+
+	if !s.config.Testing {
+		log.Fatal(srv.ListenAndServe())
+	} else {
+		go func() {
+			log.Fatal(srv.ListenAndServe())
+		}()
+	}
 }
 
 func loggingMiddleware(next http.Handler) http.Handler {
