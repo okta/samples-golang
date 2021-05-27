@@ -35,6 +35,7 @@ type Config struct {
 			RedirectURI  string   `mapstructure:"redirectUri" schema:"redirect_uri"`
 		} `mapstructure:"idx"`
 	} `mapstructure:"okta"`
+	Testing bool
 }
 
 func (c *Config) Validate() error {
