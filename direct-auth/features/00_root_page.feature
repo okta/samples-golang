@@ -8,11 +8,13 @@ Feature: 0.1 Root page for Direct Auth Demo Application
 
   Scenario: 0.1.2 Mary visits the Root View and WITH an authentcation session
     Given Mary navigates to the Root View
-    Then Mary sees a table with the claims from the /userinfo response
+    Then Mary logs in to the Application
+    And Mary sees a table with the claims from the /userinfo response
     And Mary sees a logout button
 
   Scenario: 0.1.3 Mary logs out of the app
-    Given Mary navigates to the Root View WITH an authentcation session 
+    Given Mary navigates to the Root View
+    Then Mary logs in to the Application
     When Mary clicks the logout button
     Then her access token is revoked
     And her app session is destroyed
