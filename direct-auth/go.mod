@@ -2,6 +2,8 @@ module github.com/okta/samples-golang/direct-auth
 
 go 1.14
 
+replace github.com/okta/okta-idx-golang => /Users/bretterer/Code/okta-identity-engine-golang
+
 require (
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gorilla/mux v1.8.0
