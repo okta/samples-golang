@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -54,9 +53,7 @@ type ViewData map[string]interface{}
 var sessionStore = sessions.NewCookieStore([]byte("okta-direct-auth-session-store"))
 
 func NewServer(c *config.Config) *Server {
-
 	idx, err := idx.NewClient()
-
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -71,7 +68,6 @@ func NewServer(c *config.Config) *Server {
 			"Errors":        "",
 		},
 	}
-
 }
 
 func (s *Server) Config() *config.Config {
@@ -93,9 +89,10 @@ func (s *Server) Run() {
 
 	r.HandleFunc("/login", s.login).Methods("GET")
 	r.HandleFunc("/login", s.handleLogin).Methods("POST")
-	r.HandleFunc("/login/options", s.handleLoginOptions).Methods("GET")
-	r.HandleFunc("/login/email", s.handleLoginEmailVerification).Methods("GET")
-	r.HandleFunc("/login/email", s.handleLoginEmailConfirmation).Methods("POST")
+	r.HandleFunc("/login/factors", s.handleLoginSecondaryFactors).Methods("GET")
+	r.HandleFunc("/login/factors/proceed", s.handleLoginSecondaryFactorsProceed).Methods("POST")
+	r.HandleFunc("/login/factors/email", s.handleLoginEmailVerification).Methods("GET")
+	r.HandleFunc("/login/factors/email", s.handleLoginEmailConfirmation).Methods("POST")
 
 	r.HandleFunc("/login/callback", s.handleLoginCallback).Methods("GET")
 
@@ -200,7 +197,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.cache.Set("loginResponse", lr, time.Minute*5)
-	http.Redirect(w, r, "/login/options", http.StatusFound)
+	http.Redirect(w, r, "/login/factors", http.StatusFound)
 	return
 }
 
@@ -208,7 +205,7 @@ func (s *Server) handleLoginEmailVerification(w http.ResponseWriter, r *http.Req
 	clr, _ := s.cache.Get("loginResponse")
 	lr := clr.(*idx.LoginResponse)
 	if !lr.HasStep(idx.LoginStepEmailVerification) {
-		http.Redirect(w, r, "login/options", http.StatusFound)
+		http.Redirect(w, r, "/login/factors", http.StatusFound)
 		return
 	}
 	invCode, ok := s.ViewData["InvalidEmailCode"]
@@ -228,20 +225,18 @@ func (s *Server) handleLoginEmailConfirmation(w http.ResponseWriter, r *http.Req
 	clr, _ := s.cache.Get("loginResponse")
 	lr := clr.(*idx.LoginResponse)
 	if !lr.HasStep(idx.LoginStepEmailConfirmation) {
-		http.Redirect(w, r, "login/options", http.StatusFound)
+		http.Redirect(w, r, "login/", http.StatusFound)
 		return
 	}
-	lr, err := lr.ConfirmEmail(r.Context(),  r.FormValue("code"))
+	session, err := sessionStore.Get(r, "direct-auth")
 	if err != nil {
-		var idxErr *idx.ErrorResponse
-		if errors.As(err, &idxErr) {
-			for _, v := range idxErr.Message.Values {
-				if strings.Contains(v.Message, "Invalid") {
-					s.ViewData["InvalidEmailCode"] = true
-				}
-			}
-		}
-		http.Redirect(w, r, "/login/email", http.StatusFound)
+		log.Fatalf("could not get store: %s", err)
+	}
+	lr, err = lr.ConfirmEmail(r.Context(), r.FormValue("code"))
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login/factors/email", http.StatusFound)
 		return
 	}
 	s.cache.Set("loginResponse", lr, time.Minute*5)
@@ -264,14 +259,22 @@ func (s *Server) handleLoginEmailConfirmation(w http.ResponseWriter, r *http.Req
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
-func (s *Server) handleLoginOptions(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleLoginSecondaryFactors(w http.ResponseWriter, r *http.Request) {
 	clr, _ := s.cache.Get("loginResponse")
 	lr := clr.(*idx.LoginResponse)
 
 	if lr.HasStep(idx.LoginStepEmailVerification) {
-		s.ViewData["LoginEmail"] = true
+		s.ViewData["FactorEmail"] = true
 	}
-	s.render("loginOptions.gohtml", w, r)
+	s.render("loginSecondaryFactors.gohtml", w, r)
+}
+
+func (s *Server) handleLoginSecondaryFactorsProceed(w http.ResponseWriter, r *http.Request) {
+	if r.FormValue("push_email") != "" {
+		http.Redirect(w, r, "/login/factors/email", http.StatusFound)
+		return
+	}
+	http.Redirect(w, r, "/login/factors", http.StatusFound)
 }
 
 func (s *Server) handleLoginCallback(w http.ResponseWriter, r *http.Request) {
@@ -279,7 +282,7 @@ func (s *Server) handleLoginCallback(w http.ResponseWriter, r *http.Request) {
 	s.cache.Delete("loginResponse")
 	lr := clr.(*idx.LoginResponse)
 
-	//Get session store so we can store our tokens
+	// Get session store so we can store our tokens
 	session, err := sessionStore.Get(r, "direct-auth")
 	if err != nil {
 		log.Fatalf("could not get store: %s", err)
@@ -319,7 +322,6 @@ func (s *Server) handleLoginCallback(w http.ResponseWriter, r *http.Request) {
 
 	// redirect the user to /profile
 	http.Redirect(w, r, "/", http.StatusFound)
-
 }
 
 // func (s *Server) handlePrimaryLogin(w http.ResponseWriter, r *http.Request) {
