@@ -46,5 +46,4 @@ func main() {
 	App.Server = server
 
 	server.Run()
-
 }

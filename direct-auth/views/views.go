@@ -26,8 +26,10 @@ import (
 	"github.com/okta/samples-golang/direct-auth/config"
 )
 
-var tpl *template.Template
-var cfg *config.Config
+var (
+	tpl *template.Template
+	cfg *config.Config
+)
 
 type ViewConfig struct {
 	config      *config.Config
