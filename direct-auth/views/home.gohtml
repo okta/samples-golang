@@ -43,10 +43,10 @@
                           <tbody>
                             {{range $key, $value := .Profile}}
                             <tr class="bg-white">
-                              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              <td id="{{$key}}-key" class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                 {{$key}}
                               </td>
-                              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <td id="{{$key}}-value" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {{$value}}
                               </td>
                             </tr>

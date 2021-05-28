@@ -21,7 +21,9 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/cucumber/godog"
 	"github.com/cucumber/godog/colors"
@@ -35,6 +37,20 @@ type TestHarness struct {
 	server       *server.Server
 	wd           selenium.WebDriver
 	capabilities selenium.Capabilities
+}
+
+func defaultTimeout() time.Duration {
+	return time.Duration(time.Second * 10)
+}
+
+func defaultInterval() time.Duration {
+	return time.Duration(time.Second * 3)
+}
+
+func debug(text string) {
+	if os.Getenv("DEBUG") == "true" {
+		fmt.Println(text)
+	}
 }
 
 func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
@@ -61,12 +77,40 @@ func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 }
 
 func (th *TestHarness) navigateToTheRootView() error {
+	debug("navigateToTheRootView")
 	rootURL := fmt.Sprintf("http://%s/", th.server.Address())
 	err := th.wd.Get(rootURL)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return th.waitForPageRender()
+}
+
+func (th *TestHarness) isRootView() error {
+	debug("isRootView")
+	rootURL := fmt.Sprintf("http://%s/", th.server.Address())
+
+	url, err := th.wd.CurrentURL()
+	if err != nil {
+		return err
+	}
+
+	if rootURL != url {
+		return fmt.Errorf("isRootView expects %q url, finds %q url", rootURL, url)
+
+	}
+
+	return nil
+}
+
+func (th *TestHarness) waitForPageRender() error {
+	debug("waitForPageRender")
+	return th.seesElement(`html body h1`)
 }
 
 func (th *TestHarness) checkEntryPoints() error {
+	debug("cehckEntryPoints")
 	baseURL := fmt.Sprintf("http://%s", th.server.Address())
 	links := []struct {
 		text string
@@ -78,15 +122,15 @@ func (th *TestHarness) checkEntryPoints() error {
 		},
 		{
 			text: "Sign Up",
-			href: fmt.Sprintf("%s/sign-up", baseURL),
+			href: fmt.Sprintf("%s/register", baseURL),
 		},
 		{
 			text: "Password Recovery",
-			href: fmt.Sprintf("%s/password-recovery", baseURL),
+			href: fmt.Sprintf("%s/basic-login", baseURL),
 		},
 		{
 			text: "Logout",
-			href: fmt.Sprintf("%s/logout", baseURL),
+			href: fmt.Sprintf("%s/basic-login", baseURL),
 		},
 	}
 
@@ -101,6 +145,225 @@ func (th *TestHarness) checkEntryPoints() error {
 		}
 	}
 
+	return nil
+}
+
+func (th *TestHarness) waitForLoginForm() error {
+	debug("waitForLoginForm")
+	return th.seesElement(`form[action="/login"]`)
+}
+
+func (th *TestHarness) loginToApplication() error {
+	debug("loginToApplication")
+	err := th.clickLink("Sign In")
+	if err != nil {
+		return err
+	}
+
+	if err = th.waitForPageRender(); err != nil {
+		return err
+	}
+
+	if err = th.waitForLoginForm(); err != nil {
+		return err
+	}
+
+	if err = th.entersText(`input[name="identifier"]`, os.Getenv("EMAIL")); err != nil {
+		return err
+	}
+
+	if err = th.entersText(`input[name="password"]`, os.Getenv("PASSWORD")); err != nil {
+		return err
+	}
+
+	if err = th.clicksButtonWithText(`button[type="submit"]`, "Login"); err != nil {
+		return err
+	}
+
+	if err = th.waitForPageRender(); err != nil {
+		return err
+	}
+
+	text := fmt.Sprintf("Welcome, %s.", claimItem("name"))
+	return th.seesElementWithText(`html body h1`, text)
+}
+
+func claims() map[string]string {
+	claimsJSON := os.Getenv("CLAIMS")
+	claims := map[string]string{}
+	err := json.Unmarshal([]byte(claimsJSON), &claims)
+	if err != nil {
+		fmt.Printf("unable to unmarshal env var CLAIMS %q\n", claimsJSON)
+		return map[string]string{}
+	}
+	return claims
+}
+
+func claimItem(key string) string {
+	value, _ := claims()[key]
+	return value
+}
+
+func (th *TestHarness) seesClaimsTable() error {
+	debug("seesClaimsTable")
+
+	claims := claims()
+
+	for claim, value := range claims {
+		keyID := fmt.Sprintf("%s-key", claim)
+		err := th.seesElementIDWithValue(keyID, claim)
+		if err != nil {
+			return err
+		}
+
+		valID := fmt.Sprintf("%s-value", claim)
+		if err = th.seesElementIDWithValue(valID, value); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (th *TestHarness) seesLogoutButton() error {
+	return th.seesElementWithText(`button[type="submit"]`, "Logout")
+}
+
+func (th *TestHarness) clicksLogoutButton() error {
+	return th.clicksButtonWithText(`button[type="submit"]`, "Logout")
+}
+
+func (th *TestHarness) seesElement(selector string) error {
+	debug(fmt.Sprintf("seesElement %q\n", selector))
+	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		if _, err := th.wd.FindElement(selenium.ByCSSSelector, selector); err != nil {
+			return false, nil
+		}
+
+		return true, nil
+	}, defaultTimeout(), defaultInterval())
+
+	return err
+}
+
+func (th *TestHarness) clickLink(text string) error {
+	debug(fmt.Sprintf("clickLink %q\n", text))
+	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elem, err := th.wd.FindElement(selenium.ByLinkText, text)
+		if err != nil {
+			return false, nil
+		}
+
+		if err = elem.Click(); err != nil {
+			return false, err
+		}
+
+		return true, nil
+	}, defaultTimeout(), defaultInterval())
+
+	return err
+}
+
+func (th *TestHarness) entersText(selector, text string) error {
+	debug(fmt.Sprintf("entersText %q %q\n", selector, text))
+	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
+		if err != nil {
+			return false, nil
+		}
+
+		if err = elem.Clear(); err != nil {
+			return false, err
+		}
+
+		if err = elem.Click(); err != nil {
+			return false, err
+		}
+
+		if err = elem.SendKeys(text); err != nil {
+			return false, err
+		}
+
+		return true, nil
+	}, defaultTimeout(), defaultInterval())
+
+	return err
+}
+
+func (th *TestHarness) seesElementWithText(selector, text string) error {
+	debug(fmt.Sprintf("seesElementWithText %q %q\n", selector, text))
+	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
+		if err != nil {
+			return false, nil
+		}
+
+		elemText, err := elem.Text()
+		if err != nil {
+			return false, nil
+		}
+
+		if strings.TrimSpace(elemText) != text {
+			return false, nil
+		}
+
+		return true, nil
+	}, defaultTimeout(), defaultInterval())
+
+	return err
+}
+
+func (th *TestHarness) clicksButtonWithText(selector, text string) error {
+	debug(fmt.Sprintf("clicksButtonWithText %q %q\n", selector, text))
+	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
+		if err != nil {
+			return false, nil
+		}
+
+		elemText, err := elem.Text()
+		if err != nil {
+			return false, nil
+		}
+
+		if strings.TrimSpace(elemText) != text {
+			return false, nil
+		}
+
+		if err = elem.Click(); err != nil {
+			return false, err
+		}
+
+		return true, nil
+	}, defaultTimeout(), defaultInterval())
+
+	return err
+}
+
+func (th *TestHarness) seesElementIDWithValue(elementID, text string) error {
+	debug(fmt.Sprintf("seesElementIDWithValue %q %q\n", elementID, text))
+	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elem, err := th.wd.FindElement(selenium.ByID, elementID)
+		if err != nil {
+			return false, nil
+		}
+
+		elemText, err := elem.Text()
+		if err != nil {
+			return false, nil
+		}
+
+		if strings.TrimSpace(elemText) != text {
+			return false, nil
+		}
+
+		return true, nil
+	}, defaultTimeout(), defaultInterval())
+
+	return err
+}
+
+func (th *TestHarness) noop() error {
 	return nil
 }
 
@@ -132,9 +395,8 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	})
 
 	ctx.AfterScenario(func(sc *messages.Pickle, err error) {
-		// force a logout and go back to home
-		logoutURL := fmt.Sprintf("%s%s", th.server.Address(), "logout")
-		logoutXHR := fmt.Sprintf("var xhr = new XMLHttpRequest();\nxhr.open(\"POST\", %q, false);\nxhr.send('');", logoutURL)
+		// force a logout
+		logoutXHR := fmt.Sprintf("var xhr = new XMLHttpRequest(); xhr.open(\"POST\", \"/logout\", false); xhr.send(\"\");")
 		_, _ = th.wd.ExecuteScript(logoutXHR, nil)
 		err = th.wd.Quit()
 		if err != nil {
@@ -142,8 +404,15 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 		}
 	})
 
-	ctx.Step(`^Mary navigates to the Root View$`, th.navigateToTheRootView)
+	ctx.Step(`navigates to the Root View`, th.navigateToTheRootView)
 	ctx.Step(`Root Page shows links to the Entry Points`, th.checkEntryPoints)
+	ctx.Step(`logs in to the Application`, th.loginToApplication)
+	ctx.Step(`sees a table with the claims`, th.seesClaimsTable)
+	ctx.Step(`sees a logout button`, th.seesLogoutButton)
+	ctx.Step(`clicks the logout button`, th.clicksLogoutButton)
+	ctx.Step(`access token is revoked`, th.noop)  // FIXME
+	ctx.Step(`app session is destroyed`, th.noop) // FIXME
+	ctx.Step(`is redirected back to the Root View`, th.isRootView)
 }
 
 var opts = godog.Options{
