@@ -11,7 +11,7 @@
 
                   <h1 class="text-4xl pb-4">Second Factor Enrollment</h1>
 
-                  <form class="space-y-6" action="/reset-pw/newPassword" method="POST">
+                  <form class="space-y-6" action="/enrollFactor" method="POST">
                     {{if ne .Errors ""}}
                     <div class="mx-auto py-4 px-2 my-2 w-full border-2 border-red-400 bg-red-100 ">
                     {{.Errors}}
@@ -22,33 +22,25 @@
                       <div class="max-w-lg">
                         <p class="text-sm text-gray-500">We require you to enroll in the following factors</p>
                         <div class="mt-4 space-y-4">
+                          {{ range $key, $authenticator := .authenticators }}
                           <div class="flex items-center">
-                            <input id="push_everything" name="push_notifications" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
-                            <label for="push_everything" class="ml-3 block text-sm font-medium text-gray-700">
-                              Everything
+                            <input id="authenticator_{{$authenticator.DisplayName}}" name="authenticator" value="{{$authenticator.DisplayName}}" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
+                            <label for="authenticator_{{$authenticator.DisplayName}}" class="ml-3 block text-sm font-medium text-gray-700">
+                              {{ $authenticator.DisplayName }}
                             </label>
                           </div>
-                          <div class="flex items-center">
-                            <input id="push_email" name="push_notifications" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
-                            <label for="push_email" class="ml-3 block text-sm font-medium text-gray-700">
-                              Same as email
-                            </label>
-                          </div>
-                          <div class="flex items-center">
-                            <input id="push_nothing" name="push_notifications" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
-                            <label for="push_nothing" class="ml-3 block text-sm font-medium text-gray-700">
-                              No push notifications
-                            </label>
-                          </div>
+                          {{ end }}
                         </div>
                       </div>
                     </div>
 
                     <div class="pt-5">
                       <div class="flex justify-end">
+                        {{ if .skip }}
                         <button type="button" class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                           Skip
                         </button>
+                        {{ end }}
                         <button type="submit" class="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                           Continue
                         </button>
