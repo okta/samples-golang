@@ -1,6 +1,6 @@
 module github.com/okta/samples-golang
 
-go 1.14
+go 1.15
 
 require (
 	github.com/gorilla/sessions v1.2.1

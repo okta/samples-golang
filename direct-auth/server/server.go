@@ -562,7 +562,6 @@ func (s *Server) handleEnrollPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/", http.StatusFound)
-
 }
 
 func (s *Server) enrollPhone(w http.ResponseWriter, r *http.Request) {
@@ -570,7 +569,6 @@ func (s *Server) enrollPhone(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleEnrollPhone(w http.ResponseWriter, r *http.Request) {
-
 }
 
 func (s *Server) enrollEmail(w http.ResponseWriter, r *http.Request) {
@@ -578,7 +576,6 @@ func (s *Server) enrollEmail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleEnrollEmail(w http.ResponseWriter, r *http.Request) {
-
 }
 
 func (s *Server) passwordReset(w http.ResponseWriter, r *http.Request) {
@@ -597,7 +594,6 @@ func (s *Server) handlePasswordReset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rpr, err := s.idxClient.InitPasswordReset(context.TODO(), ir)
-
 	if err != nil {
 		session.Values["Errors"] = err.Error()
 		session.Save(r, w)
