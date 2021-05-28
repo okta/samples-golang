@@ -93,6 +93,9 @@ func (s *Server) Run() {
 	r.HandleFunc("/login/factors/proceed", s.handleLoginSecondaryFactorsProceed).Methods("POST")
 	r.HandleFunc("/login/factors/email", s.handleLoginEmailVerification).Methods("GET")
 	r.HandleFunc("/login/factors/email", s.handleLoginEmailConfirmation).Methods("POST")
+	r.HandleFunc("/login/factors/phone/method", s.handleLoginPhoneVerificationMethod).Methods("GET")
+	r.HandleFunc("/login/factors/phone", s.handleLoginPhoneVerification).Methods("GET")
+	r.HandleFunc("/login/factors/phone", s.handleLoginPhoneConfirmation).Methods("POST")
 
 	r.HandleFunc("/login/callback", s.handleLoginCallback).Methods("GET")
 
@@ -201,6 +204,31 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+func (s *Server) handleLoginSecondaryFactors(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	lr := clr.(*idx.LoginResponse)
+
+	if lr.HasStep(idx.LoginStepEmailVerification) {
+		s.ViewData["FactorEmail"] = true
+	}
+	if lr.HasStep(idx.LoginStepPhoneVerification) {
+		s.ViewData["FactorPhone"] = true
+	}
+	s.render("loginSecondaryFactors.gohtml", w, r)
+}
+
+func (s *Server) handleLoginSecondaryFactorsProceed(w http.ResponseWriter, r *http.Request) {
+	if r.FormValue("push_email") != "" {
+		http.Redirect(w, r, "/login/factors/email", http.StatusFound)
+		return
+	}
+	if r.FormValue("push_phone") != "" {
+		http.Redirect(w, r, "/login/factors/phone/method", http.StatusFound)
+		return
+	}
+	http.Redirect(w, r, "/login/factors", http.StatusFound)
+}
+
 func (s *Server) handleLoginEmailVerification(w http.ResponseWriter, r *http.Request) {
 	clr, _ := s.cache.Get("loginResponse")
 	lr := clr.(*idx.LoginResponse)
@@ -217,8 +245,7 @@ func (s *Server) handleLoginEmailVerification(w http.ResponseWriter, r *http.Req
 		}
 		s.cache.Set("loginResponse", lr, time.Minute*5)
 	}
-
-	s.render("loginEmail.gohtml", w, r)
+	s.render("loginFactorEmail.gohtml", w, r)
 }
 
 func (s *Server) handleLoginEmailConfirmation(w http.ResponseWriter, r *http.Request) {
@@ -234,6 +261,7 @@ func (s *Server) handleLoginEmailConfirmation(w http.ResponseWriter, r *http.Req
 	}
 	lr, err = lr.ConfirmEmail(r.Context(), r.FormValue("code"))
 	if err != nil {
+		s.ViewData["InvalidEmailCode"] = true
 		session.Values["Errors"] = err.Error()
 		session.Save(r, w)
 		http.Redirect(w, r, "/login/factors/email", http.StatusFound)
@@ -254,26 +282,99 @@ func (s *Server) handleLoginEmailConfirmation(w http.ResponseWriter, r *http.Req
 		if err != nil {
 			log.Fatalf("could not save access token: %s", err)
 		}
-	}
-	// redirect the user to /profile
-	http.Redirect(w, r, "/", http.StatusFound)
-}
-
-func (s *Server) handleLoginSecondaryFactors(w http.ResponseWriter, r *http.Request) {
-	clr, _ := s.cache.Get("loginResponse")
-	lr := clr.(*idx.LoginResponse)
-
-	if lr.HasStep(idx.LoginStepEmailVerification) {
-		s.ViewData["FactorEmail"] = true
-	}
-	s.render("loginSecondaryFactors.gohtml", w, r)
-}
-
-func (s *Server) handleLoginSecondaryFactorsProceed(w http.ResponseWriter, r *http.Request) {
-	if r.FormValue("push_email") != "" {
-		http.Redirect(w, r, "/login/factors/email", http.StatusFound)
+		// redirect the user to /profile
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
+	lr, err = lr.WhereAmI(r.Context())
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+	s.cache.Set("loginResponse", lr, time.Minute*5)
+	http.Redirect(w, r, "/login/factors", http.StatusFound)
+}
+
+func (s *Server) handleLoginPhoneVerificationMethod(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	lr := clr.(*idx.LoginResponse)
+	if !lr.HasStep(idx.LoginStepPhoneVerification) {
+		http.Redirect(w, r, "/login/factors", http.StatusFound)
+		return
+	}
+	s.render("loginFactorPhoneMethod.gohtml", w, r)
+}
+
+func (s *Server) handleLoginPhoneVerification(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	lr := clr.(*idx.LoginResponse)
+	if !lr.HasStep(idx.LoginStepPhoneVerification) {
+		http.Redirect(w, r, "/login/factors", http.StatusFound)
+		return
+	}
+	// get method
+	a := r.FormValue("voice")
+	b := r.FormValue("sms")
+	_ = a
+	_ = b
+	invCode, ok := s.ViewData["InvalidPhoneCode"]
+	if !ok || !invCode.(bool) {
+		lr, err := lr.VerifyPhone(r.Context(), idx.PhoneMethodSMS)
+		if err != nil {
+			http.Redirect(w, r, "/login/factors", http.StatusFound)
+			return
+		}
+		s.cache.Set("loginResponse", lr, time.Minute*5)
+	}
+	s.render("loginFactorPhone.gohtml", w, r)
+}
+
+func (s *Server) handleLoginPhoneConfirmation(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	lr := clr.(*idx.LoginResponse)
+	if !lr.HasStep(idx.LoginStepPhoneConfirmation) {
+		http.Redirect(w, r, "/login/factors", http.StatusFound)
+		return
+	}
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+	lr, err = lr.ConfirmPhone(r.Context(), r.FormValue("code"))
+	if err != nil {
+		s.ViewData["InvalidPhoneCode"] = true
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login/factors/phone", http.StatusFound)
+		return
+	}
+	s.ViewData["InvalidPhoneCode"] = false
+	// If we have tokens we have success, so lets store tokens
+	if lr.Token() != nil {
+		session, err := sessionStore.Get(r, "direct-auth")
+		if err != nil {
+			log.Fatalf("could not get store: %s", err)
+		}
+		session.Values["access_token"] = lr.Token().AccessToken
+		session.Values["id_token"] = lr.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+		// redirect the user to /profile
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	lr, err = lr.WhereAmI(r.Context())
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+	s.cache.Set("loginResponse", lr, time.Minute*5)
 	http.Redirect(w, r, "/login/factors", http.StatusFound)
 }
 
