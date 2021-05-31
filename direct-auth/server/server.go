@@ -107,7 +107,9 @@ func (s *Server) Run() {
 	r.HandleFunc("/enrollEmail", s.enrollEmail).Methods("GET")
 	r.HandleFunc("/enrollEmail", s.handleEnrollEmail).Methods("POST")
 	r.HandleFunc("/enrollPhone", s.enrollPhone).Methods("GET")
-	r.HandleFunc("/enrollPhone", s.handleEnrollPhone).Methods("POST")
+	r.HandleFunc("/enrollPhone", s.enrollPhoneMethod).Methods("POST")
+	r.HandleFunc("/enrollPhone/method", s.handleEnrollPhoneMethod).Methods("GET")
+	r.HandleFunc("/enrollPhone/code", s.handleEnrollPhoneCode).Methods("POST")
 	r.HandleFunc("/enrollPassword", s.enrollPassword).Methods("GET")
 	r.HandleFunc("/enrollPassword", s.handleEnrollPassword).Methods("POST")
 
@@ -140,8 +142,8 @@ func (s *Server) Run() {
 	srv := &http.Server{
 		Handler:      r,
 		Addr:         "127.0.0.1:8000",
-		WriteTimeout: 15 * time.Second,
-		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 60 * time.Second,
+		ReadTimeout:  60 * time.Second,
 	}
 
 	log.Fatal(srv.ListenAndServe())
@@ -460,13 +462,9 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/register", http.StatusFound)
 		return
 	}
-
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
 	if enrollResponse.HasStep(idx.EnrollmentStepPasswordSetup) {
-		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
-
-		// Store the enroll respose in cache to use in the handler
-		s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
-
+		http.Redirect(w, r, "/enrollPassword", http.StatusFound)
 		return
 	}
 	fmt.Printf("%+v\n", enrollResponse)
@@ -475,39 +473,76 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 func (s *Server) enrollFactor(w http.ResponseWriter, r *http.Request) {
 	cer, _ := s.cache.Get("enrollResponse")
 	enrollResponse := cer.(*idx.EnrollmentResponse)
-
 	if enrollResponse.HasStep(idx.EnrollmentStepSkip) {
 		s.ViewData["skip"] = true
+	} else {
+		s.ViewData["skip"] = false
 	}
-
-	s.ViewData["authenticators"] = enrollResponse.Authenticators().Value
-
+	if enrollResponse.HasStep(idx.EnrollmentStepPhoneVerification) {
+		s.ViewData["FactorPhone"] = true
+	} else {
+		s.ViewData["FactorPhone"] = false
+	}
+	if enrollResponse.HasStep(idx.EnrollmentStepEmailVerification) {
+		s.ViewData["FactorEmail"] = true
+	} else {
+		s.ViewData["FactorEmail"] = false
+	}
 	s.render("enroll.gohtml", w, r)
 }
 
 func (s *Server) handleEnrollFactor(w http.ResponseWriter, r *http.Request) {
+	if r.FormValue("push_email") != "" {
+		http.Redirect(w, r, "/enrollEmail", http.StatusFound)
+		return
+	}
+	if r.FormValue("push_phone") != "" {
+		http.Redirect(w, r, "/enrollPhone", http.StatusFound)
+		return
+	}
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
 	// Get session store so we can store our tokens
 	session, err := sessionStore.Get(r, "direct-auth")
 	if err != nil {
 		log.Fatalf("could not get store: %s", err)
 	}
-
-	switch authenticator := r.FormValue("authenticator"); authenticator {
-	case "Password":
-		http.Redirect(w, r, "/enrollPassword", http.StatusFound)
-		return
-	case "Phone":
-		http.Redirect(w, r, "/enrollPhone", http.StatusFound)
-		return
-	case "Email":
-		http.Redirect(w, r, "/enrollEmail", http.StatusFound)
-		return
-	default:
-		session.Values["Errors"] = "We do not support the authenticator " + authenticator + " in this sample."
-		session.Save(r, w)
+	if enrollResponse.HasStep(idx.EnrollmentStepSkip) {
+		enrollResponse, err = enrollResponse.Skip(r.Context())
+		if err != nil {
+			session.Values["Errors"] = err.Error()
+			session.Save(r, w)
+			http.Redirect(w, r, "/register", http.StatusFound)
+			return
+		}
+		// If we have tokens we have success, so lets store tokens
+		if enrollResponse.Token() != nil {
+			session, err := sessionStore.Get(r, "direct-auth")
+			if err != nil {
+				log.Fatalf("could not get store: %s", err)
+			}
+			session.Values["access_token"] = enrollResponse.Token().AccessToken
+			session.Values["id_token"] = enrollResponse.Token().IDToken
+			err = session.Save(r, w)
+			if err != nil {
+				log.Fatalf("could not save access token: %s", err)
+			}
+			// redirect the user to /profile
+			http.Redirect(w, r, "/", http.StatusFound)
+			return
+		}
+		enrollResponse, err = enrollResponse.WhereAmI(r.Context())
+		if err != nil {
+			session.Values["Errors"] = err.Error()
+			session.Save(r, w)
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
+		s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
 		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
-		return
+
 	}
+	http.Redirect(w, r, "/enrollFactor", http.StatusFound)
 }
 
 func (s *Server) enrollPassword(w http.ResponseWriter, r *http.Request) {
@@ -546,6 +581,7 @@ func (s *Server) handleEnrollPassword(w http.ResponseWriter, r *http.Request) {
 
 	if !enrollResponse.HasStep(idx.EnrollmentStepSuccess) {
 		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
 	}
 
 	if enrollResponse.Token() != nil {
@@ -568,14 +604,169 @@ func (s *Server) enrollPhone(w http.ResponseWriter, r *http.Request) {
 	s.render("enrollPhone.gohtml", w, r)
 }
 
-func (s *Server) handleEnrollPhone(w http.ResponseWriter, r *http.Request) {
+func (s *Server) enrollPhoneMethod(w http.ResponseWriter, r *http.Request) {
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+	session.Values["phoneNumber"] = r.FormValue("phoneNumber")
+	session.Save(r, w)
+	s.render("enrollPhoneMethod.gohtml", w, r)
+}
+
+func (s *Server) handleEnrollPhoneCode(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+	enrollResponse, err = enrollResponse.ConfirmPhone(r.Context(), r.FormValue("code"))
+	if err != nil {
+		s.ViewData["InvalidPhoneCode"] = true
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		s.render("enrollPhoneCode.gohtml", w, r)
+		return
+	}
+	s.ViewData["InvalidPhoneCode"] = false
+	// If we have tokens we have success, so lets store tokens
+	if enrollResponse.Token() != nil {
+		session, err := sessionStore.Get(r, "direct-auth")
+		if err != nil {
+			log.Fatalf("could not get store: %s", err)
+		}
+		session.Values["access_token"] = enrollResponse.Token().AccessToken
+		session.Values["id_token"] = enrollResponse.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+		// redirect the user to /profile
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	enrollResponse, err = enrollResponse.WhereAmI(r.Context())
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+	http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+}
+
+func (s *Server) handleEnrollPhoneMethod(w http.ResponseWriter, r *http.Request) {
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+	pn := session.Values["phoneNumber"]
+	if pn == nil {
+		session.Values["Errors"] = "Invalid phone phone Number"
+		session.Save(r, w)
+		http.Redirect(w, r, "/enrollPhone", http.StatusFound)
+		return
+	}
+	var pm idx.PhoneOption
+	spm := session.Values["phoneMethod"]
+	if spm != nil {
+		pm = spm.(idx.PhoneOption)
+	} else if r.FormValue("voice") != "" {
+		pm = idx.PhoneMethodVoiceCall
+	} else if r.FormValue("sms") != "" {
+		pm = idx.PhoneMethodSMS
+	} else {
+		session.Values["Errors"] = "Unsupported phone method"
+		session.Save(r, w)
+		http.Redirect(w, r, "/enrollPhone/method", http.StatusFound)
+		return
+	}
+	session.Values["phoneMethod"] = pm
+	session.Save(r, w)
+
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+
+	invCode, ok := s.ViewData["InvalidPhoneCode"]
+	if !ok || !invCode.(bool) {
+		enrollResponse, err = enrollResponse.VerifyPhone(r.Context(), pm, pn.(string))
+		if err != nil {
+			session.Values["Errors"] = err.Error()
+			session.Save(r, w)
+			http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+			return
+		}
+		s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+	}
+	s.render("enrollPhoneCode.gohtml", w, r)
 }
 
 func (s *Server) enrollEmail(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepEmailVerification) {
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+	invCode, ok := s.ViewData["InvalidEmailCode"]
+	if !ok || !invCode.(bool) {
+		enrollResponse, err := enrollResponse.VerifyEmail(r.Context())
+		if err != nil {
+			http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+			return
+		}
+		s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+	}
 	s.render("enrollEmail.gohtml", w, r)
 }
 
 func (s *Server) handleEnrollEmail(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepEmailConfirmation) {
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+	enrollResponse, err = enrollResponse.ConfirmEmail(r.Context(), r.FormValue("code"))
+	if err != nil {
+		s.ViewData["InvalidEmailCode"] = true
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/enrollEmail", http.StatusFound)
+		return
+	}
+	s.ViewData["InvalidEmailCode"] = false
+	if enrollResponse.Token() != nil {
+		session, err := sessionStore.Get(r, "direct-auth")
+		if err != nil {
+			log.Fatalf("could not get store: %s", err)
+		}
+		session.Values["access_token"] = enrollResponse.Token().AccessToken
+		session.Values["id_token"] = enrollResponse.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+		// redirect the user to /profile
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	enrollResponse, err = enrollResponse.WhereAmI(r.Context())
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+	http.Redirect(w, r, "/enrollFactor", http.StatusFound)
 }
 
 func (s *Server) passwordReset(w http.ResponseWriter, r *http.Request) {
