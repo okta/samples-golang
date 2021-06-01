@@ -17,6 +17,5 @@ Feature: 0.1 Root page for Direct Auth Demo Application
     Then Mary logs in to the Application
     And Mary sees a table with the claims from the /userinfo response
     And Mary clicks the logout button
-    Then her access token is revoked
-    And her app session is destroyed
+    Then she is logged out
     And she is redirected back to the Root View

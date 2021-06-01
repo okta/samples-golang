@@ -48,6 +48,7 @@ environment variables are utilized in the tests.
 * `PASSWORD` - The test users's password.
 * `CLAIMS` - Name/value JSON map of claims that will be checked.
 * `SELENIUM_URL` - The Selenium server's URL.
+* `DEBUG=true` - A number of debug loglines from the godog harness.
 
 ```
 $ export CLAIMS='{"email":"tester@okta.com","email_verified":"","family_name":"Er","given_name":"Test","locale":"en-US","name":"TestEr","preferred_username":"tester@okta.com","sub":"00abcdefghijklmnopqr","updated_at":"","zoneinfo":"America/Los_Angeles"}'
