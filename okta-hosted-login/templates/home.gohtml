@@ -4,7 +4,7 @@
 <div id="content" class="ui text container">
   <h2>Okta Hosted Login + Golang Example</h2>
 
-{{if .IsAuthenticated}}
+  {{if .IsAuthenticated}}
   <div>
     <p>Welcome back, <span>{{.Profile.name}}</span>!</p>
     <p>You have successfully authenticated against your Okta org, and have been redirected back to this application.</p>
@@ -15,10 +15,12 @@
   <div>
     <p>Hello!</p>
     <p>If you're viewing this page then you have successfully configured and started this example server.</p>
-    <p>This example shows you how to to add the <a href="https://developer.okta
-            .com/authentication-guide/implementing-authentication/auth-code.html">Authorization Code Flow</a> to your
+    <p>This example shows you how to to add the <a
+        href="https://developer.okta.com/authentication-guide/implementing-authentication/auth-code.html">Authorization
+        Code Flow</a> to your
       Golang application.</p>
-    <p>When you click the login button below, you will be redirected to the login page on your Okta org.  After you authenticate, you will be returned to this application.</p>
+    <p>When you click the login button below, you will be redirected to the login page on your Okta org. After you
+      authenticate, you will be returned to this application.</p>
   </div>
 
   <form method="get" action="login">

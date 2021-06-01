@@ -47,6 +47,12 @@ func setEnvVariable(env string, current string) {
 
 	for lookInFile.Scan() {
 		parts := strings.Split(lookInFile.Text(), "=")
+
+		// safety for empty lines or lines with multiple '='
+		if len(parts) != 2 {
+			continue
+		}
+
 		key, value := parts[0], parts[1]
 		if key == env {
 			os.Setenv(key, value)
