@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/cucumber/godog"
-	"github.com/cucumber/godog/colors"
 	"github.com/cucumber/messages-go/v10"
 	"github.com/okta/samples-golang/direct-auth/config"
 	"github.com/okta/samples-golang/direct-auth/server"
@@ -188,6 +187,13 @@ func (th *TestHarness) loginToApplication() error {
 	return th.seesElementWithText(`html body h1`, text)
 }
 
+func (th *TestHarness) isLoggedOut() error {
+	debug("isLoggedOut")
+
+	text := fmt.Sprintf("Welcome, %s.", claimItem("name"))
+	return th.doesNotSeeElementWithText(`html body h1`, text)
+}
+
 func claims() map[string]string {
 	claimsJSON := os.Getenv("CLAIMS")
 	claims := map[string]string{}
@@ -230,7 +236,8 @@ func (th *TestHarness) seesLogoutButton() error {
 }
 
 func (th *TestHarness) clicksLogoutButton() error {
-	return th.clicksButtonWithText(`button[type="submit"]`, "Logout")
+	result := th.clicksButtonWithText(`button[type="submit"]`, "Logout")
+	return result
 }
 
 func (th *TestHarness) seesElement(selector string) error {
@@ -267,16 +274,16 @@ func (th *TestHarness) clickLink(text string) error {
 func (th *TestHarness) entersText(selector, text string) error {
 	debug(fmt.Sprintf("entersText %q %q\n", selector, text))
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+
+		// Sleep is a hack to get OSX/Selenium synched up for text input.
+		time.Sleep(500 * time.Millisecond)
+
 		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
 		if err != nil {
 			return false, nil
 		}
 
 		if err = elem.Clear(); err != nil {
-			return false, err
-		}
-
-		if err = elem.Click(); err != nil {
 			return false, err
 		}
 
@@ -308,6 +315,28 @@ func (th *TestHarness) seesElementWithText(selector, text string) error {
 		}
 
 		return true, nil
+	}, defaultTimeout(), defaultInterval())
+
+	return err
+}
+
+func (th *TestHarness) doesNotSeeElementWithText(selector, text string) error {
+	debug(fmt.Sprintf("doesNotSeeElementWithText %q %q\n", selector, text))
+	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
+		if err != nil {
+			return true, nil
+		}
+
+		elemText, err := elem.Text()
+		if err != nil {
+			return true, nil
+		}
+		if strings.TrimSpace(elemText) != text {
+			return true, nil
+		}
+
+		return false, nil
 	}, defaultTimeout(), defaultInterval())
 
 	return err
@@ -410,27 +439,24 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`sees a table with the claims`, th.seesClaimsTable)
 	ctx.Step(`sees a logout button`, th.seesLogoutButton)
 	ctx.Step(`clicks the logout button`, th.clicksLogoutButton)
-	ctx.Step(`access token is revoked`, th.noop)  // FIXME
-	ctx.Step(`app session is destroyed`, th.noop) // FIXME
+	ctx.Step(`is logged out`, th.isLoggedOut)
 	ctx.Step(`is redirected back to the Root View`, th.isRootView)
 }
 
 var opts = godog.Options{
-	Output: colors.Colored(os.Stdout),
 	Format: "pretty", // "cucumber", "events", "junit", "pretty", "progress"
-	Strict: true,
-	Paths:  []string{"features"},
-	//ShowStepDefinitions: true,
 }
 
 func TestMain(m *testing.M) {
 	th := &TestHarness{}
 	status := godog.TestSuite{
-		Name:                 "00_root_page_test",
+		Name:                 "Golang Direct Auth sample feature tests",
 		TestSuiteInitializer: th.InitializeTestSuite,
 		ScenarioInitializer:  th.InitializeScenario,
 		Options:              &opts,
 	}.Run()
 
+	// TODO/FIXME (at least on OSX) godog is exiting 1 before here for some
+	// reason. The os.Exit below is not executing.
 	os.Exit(status)
 }

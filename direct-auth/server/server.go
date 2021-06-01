@@ -100,7 +100,7 @@ func (s *Server) Run() {
 	go s.watchForTemplates()
 
 	r := mux.NewRouter()
-	r.Use(loggingMiddleware)
+	r.Use(s.loggingMiddleware)
 
 	r.HandleFunc("/showView/{view}", s.showView).Methods("GET")
 
@@ -180,9 +180,11 @@ func (s *Server) Run() {
 	}
 }
 
-func loggingMiddleware(next http.Handler) http.Handler {
+func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("%s: %s\n", r.Method, r.RequestURI)
+		if os.Getenv("DEBUG") == "true" || !s.Config().Testing {
+			log.Printf("%s: %s\n", r.Method, r.RequestURI)
+		}
 		next.ServeHTTP(w, r)
 	})
 }
@@ -505,7 +507,6 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/enrollPassword", http.StatusFound)
 		return
 	}
-	fmt.Printf("%+v\n", enrollResponse)
 }
 
 func (s *Server) enrollFactor(w http.ResponseWriter, r *http.Request) {
@@ -835,7 +836,6 @@ func (s *Server) handlePasswordReset(w http.ResponseWriter, r *http.Request) {
 	// that was sent to the email address. If step does
 	// not exist, we encountered an error.
 	if !rpr.HasStep(idx.ResetPasswordStepEmailVerification) {
-		fmt.Printf("%+v\n", rpr.AvailableSteps())
 		session.Values["Errors"] = "We encountered an unexpected error, please try again"
 		session.Save(r, w)
 		http.Redirect(w, r, "/passwordRecovery", http.StatusFound)
@@ -851,7 +851,6 @@ func (s *Server) handlePasswordReset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !rpr.HasStep(idx.ResetPasswordStepEmailConfirmation) {
-		fmt.Printf("%+v\n", rpr.AvailableSteps())
 		session.Values["Errors"] = "We encountered an unexpected error, please try again"
 		session.Save(r, w)
 		http.Redirect(w, r, "/passwordRecovery", http.StatusFound)
@@ -1055,8 +1054,6 @@ func (s *Server) getProfileData(r *http.Request) map[string]string {
 	h := req.Header
 	h.Add("Authorization", "Bearer "+session.Values["access_token"].(string))
 	h.Add("Accept", "application/json")
-
-	fmt.Printf("%s\n", session.Values["access_token"])
 
 	client := &http.Client{}
 	resp, _ := client.Do(req)
