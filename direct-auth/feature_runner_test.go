@@ -345,6 +345,10 @@ func (th *TestHarness) doesNotSeeElementWithText(selector, text string) error {
 func (th *TestHarness) clicksButtonWithText(selector, text string) error {
 	debug(fmt.Sprintf("clicksButtonWithText %q %q\n", selector, text))
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+
+		// Sleep is a hack to get OSX/Selenium synched up for text input.
+		time.Sleep(500 * time.Millisecond)
+
 		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
 		if err != nil {
 			return false, nil
