@@ -182,6 +182,10 @@ github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLA
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
 github.com/okta/okta-idx-golang v0.0.0-20210527190915-82910d9d5752 h1:8dOj475JOrvpKuhGaSbz7mW9UMNPM9N/XlPrI8GrgRk=
 github.com/okta/okta-idx-golang v0.0.0-20210527190915-82910d9d5752/go.mod h1:h+cnPj4zH6JpdNv2+llAvTKNA3UL8ySofhJ9QVT6xoc=
+github.com/okta/okta-idx-golang v0.0.0-20210602072233-7c35ed87bfa1 h1:cna4q6l7ZQVnSGxl9yQaI1h6oE2OW03S5gwvzelcQ6U=
+github.com/okta/okta-idx-golang v0.0.0-20210602072233-7c35ed87bfa1/go.mod h1:h+cnPj4zH6JpdNv2+llAvTKNA3UL8ySofhJ9QVT6xoc=
+github.com/okta/okta-idx-golang v0.0.0-20210602213539-57c63b6540a2 h1:JHSWUhNoYHHk0t16mqd0VPNhQoq3zf3OHH2VanyS6vE=
+github.com/okta/okta-idx-golang v0.0.0-20210602213539-57c63b6540a2/go.mod h1:h+cnPj4zH6JpdNv2+llAvTKNA3UL8ySofhJ9QVT6xoc=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/patrickmn/go-cache v2.1.0+incompatible h1:HRMgzkcYKYpi3C8ajMPV8OFXaaRUnok+kx1WdO15EQc=
 github.com/patrickmn/go-cache v2.1.0+incompatible/go.mod h1:3Qf8kWWT7OJRJbdiICTKqZju1ZixQ/KpMGzzAfe6+WQ=
