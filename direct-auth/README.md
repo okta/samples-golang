@@ -59,7 +59,10 @@ environment variables are utilized for the test user in the selenium tests.
 * `DEBUG=true` - Triggers debug loglines from the godog harness to be emitted
 
 ```
+# CLIENT_ID, CLIENT_SECRET, ISSUER, SCOPES, REDIRECT_URI have been
+# exported into the shell or are set in the $HOME/.okta/okta.yaml file
+
 $ export CLAIMS='{"email":"tester@okta.com","email_verified":"","family_name":"Er","given_name":"Test","locale":"en-US","name":"TestEr","preferred_username":"tester@okta.com","sub":"00abcdefghijklmnopqr","updated_at":"","zoneinfo":"America/Los_Angeles"}'
 
-$ EMAIL=tester@okta.com PASSWORD=abc123 SELENIUM_URL="http://127.0.0.1:4444/wd/hub" go test -v
+$ USER_NAME=tester@okta.com PASSWORD=abc123 SELENIUM_URL="http://127.0.0.1:4444/wd/hub" go test -v
 ```
