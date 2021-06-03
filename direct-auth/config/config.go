@@ -19,6 +19,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -48,9 +49,9 @@ func (c *Config) Validate() error {
 	)
 }
 
-// ReadConfig reads config from file and environment variables
-// Config file should be placed either in project root dir or in $HOME/.okta/
-// If no config file provided, you should use ConfigSetters to set config
+// ReadConfig reads config from file and environment variables.  Config file
+// should be placed either in project root dir or in $HOME/.okta/ If config is
+// not provided, you should use ConfigSetters to set config.
 func ReadConfig(config interface{}, opts ...viper.DecoderConfigOption) error {
 	v := viper.New()
 	v.SetConfigName("okta")
@@ -67,6 +68,25 @@ func ReadConfig(config interface{}, opts ...viper.DecoderConfigOption) error {
 		}
 	}
 	err = v.Unmarshal(config, opts...)
+	c := config.(*Config)
+	// FIXME correct the way we are using viper with env vars
+	var val string
+	if val = os.Getenv("CLIENT_ID"); val != "" {
+		c.Okta.IDX.ClientID = val
+	}
+	if val = os.Getenv("CLIENT_SECRET"); val != "" {
+		c.Okta.IDX.ClientSecret = val
+	}
+	if val = os.Getenv("ISSUER"); val != "" {
+		c.Okta.IDX.Issuer = val
+	}
+	if val = os.Getenv("SCOPES"); val != "" {
+		c.Okta.IDX.Scopes = strings.Split(val, ",")
+	}
+	if val = os.Getenv("REDIRECT_URI"); val != "" {
+		c.Okta.IDX.RedirectURI = val
+	}
+
 	if err != nil {
 		return fmt.Errorf("failed to parse configuration: %w", err)
 	}
