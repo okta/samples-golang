@@ -147,7 +147,7 @@ func (th *TestHarness) loginToApplication() error {
 		return err
 	}
 
-	if err = th.entersText(`input[name="identifier"]`, os.Getenv("EMAIL")); err != nil {
+	if err = th.entersText(`input[name="identifier"]`, os.Getenv("USER_NAME")); err != nil {
 		return err
 	}
 
