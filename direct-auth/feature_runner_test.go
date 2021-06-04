@@ -76,11 +76,26 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 			log.Panic(err)
 		}
 	}
+
+	seleniumUrl := os.Getenv("SELENIUM_URL")
+
+	// Travis
+	inTravis := (os.Getenv("TRAVIS") == "true")
+	if inTravis {
+		capabilities["tunnel-identifier"] = os.Getenv("TRAVIS_JOB_NUMBER")
+		capabilities["build"] = os.Getenv("TRAVIS_BUILD_NUMBER")
+		capabilities["tags"] = []string{os.Getenv("TRAVIS_GO_VERSION"), "CI"}
+		sauceUsername := os.Getenv("SAUCE_USERNAME")
+		sauceAccessKey := os.Getenv("SAUCE_ACCESS_KEY")
+		seleniumUrl = fmt.Sprintf("http://%s:%s@ondemand.saucelabs.com/wd/hub", sauceUsername, sauceAccessKey)
+	}
+
 	th.capabilities = capabilities
 
 	ctx.BeforeScenario(func(sc *messages.Pickle) {
+		th.capabilities["name"] = fmt.Sprintf("Golang (%s / %s) Sample App - %q", os.Getenv("TRAVIS_GO_VERSION"), os.Getenv("TRAVIS_REPO_SLUG"), sc.Name)
 		var err error
-		th.wd, err = selenium.NewRemote(th.capabilities, os.Getenv("SELENIUM_URL"))
+		th.wd, err = selenium.NewRemote(th.capabilities, seleniumUrl)
 		if err != nil {
 			log.Panic(err)
 		}

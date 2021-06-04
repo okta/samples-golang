@@ -1,21 +1,32 @@
 language: go
-
 go:
-  - 1.14.x
-  - tip
-
-matrix:
-  allow_failures:
-    - go: tip
-
-install:
-  - npm install
-
+- 1.16.x
 script:
-  - npm test
+- cd direct-auth/ && go test -v
+env:
+  global:
 
 addons:
-  apt:
-    packages:
-    - google-chrome-stable
-    - nodejs
+  sauce_connect: true
+
+# FIXME get the samples npm test harness working again
+#
+# go:
+#   - 1.14.x
+#   - tip
+# 
+# matrix:
+#   allow_failures:
+#     - go: tip
+# 
+# install:
+#   - npm install
+# 
+# script:
+#   - npm test
+# 
+# addons:
+#   apt:
+#     packages:
+#     - google-chrome-stable
+#     - nodejs
