@@ -3,18 +3,20 @@ language: go
 go:
   - 1.16.x
 
-matrix:
-  allow_failures:
-    - go: tip
-
 install:
   - npm install
 
 script:
   - npm test
+  - cd direct-auth/ && go test -v
+  
+env:
+  global:
 
 addons:
+  sauce_connect: true
   apt:
     packages:
     - google-chrome-stable
     - nodejs
+
