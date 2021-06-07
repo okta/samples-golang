@@ -1,18 +1,29 @@
 # Okta Golang Direct Auth Sample
 
-## Setup
+## Introduction
 
-This app's modules require the `password_factor` branch
-github.com/okta/okta-idx-golang
+> :grey_exclamation: The use of this Sample uses an SDK that requires usage of
+the Okta Identity Engine.  This functionality is in general availability but is
+being gradually rolled out to customers. If you want to request to gain access
+to the Okta Identity Engine, please reach out to your account manager. If you do
+not have an account manager, please reach out to oie@okta.com for more
+information.
 
-Therfore, run go get in this fashion before running the app.
+This Sample Application will show you the best practices for integrating
+Authentication into your app using [Okta's Identity
+Engine](https://developer.okta.com/docs/concepts/ie-intro/). Specifically, this 
+application will cover some basic needed use cases to get you up and running
+quickly with Okta.
 
-```
-go env -w GO111MODULE=on
-go get github.com/okta/okta-idx-golang@password_factor
-```
+These Examples are:
 
-## Execute
+1. Sign In
+2. Sign Out
+3. Sign Up
+4. Sign In/Sign Up with Social Identity Providers
+5. Sign In with Multifactor Authentication using Email or Phone
+
+## Installation & Running The App
 
 Run the application with the go run command. 
 
@@ -29,13 +40,14 @@ Or it can use the following environment variables for the configuration.
 go run main.go
 ```
 
-## BDD / Cucumber
+## Design Patterns / Framework specific information
+
+### BDD / Cucumber
 
 The Gherkin format scenarios in `features/` can be run with our
 [godog](https://github.com/cucumber/godog) based behavior driven tests harness.
 
-First (OSX example) make sure a local Selenium server is available with the
-chromedriver.
+(OSX) First make sure a local Selenium server is available with the chromedriver.
 
 * `brew install selenium-server-standalone`
 * `brew install chromedriver`
@@ -44,6 +56,8 @@ Next, start Selenium in one shell.
 
 ```
 $ selenium-server -port 4444
+
+# or, run a selenium server with its jar directly
 ```
 
 Then run the tests in a separate shell.
