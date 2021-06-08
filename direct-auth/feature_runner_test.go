@@ -43,8 +43,7 @@ func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 		}
 		err := config.ReadConfig(cfg)
 		if err != nil {
-			fmt.Printf("%+v\n", err)
-			os.Exit(1)
+			log.Fatal(err)
 		}
 
 		server := server.NewServer(cfg)
@@ -53,9 +52,6 @@ func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 	})
 
 	ctx.AfterSuite(func() {
-		if th.server != nil {
-			th.server.Stop()
-		}
 	})
 }
 
@@ -134,9 +130,5 @@ func TestMain(m *testing.M) {
 		Options:              &opts,
 	}.Run()
 
-	// TODO / FIXME (at least on OSX) godog is exiting 1 before here for some
-	// reason. The os.Exit below is not executing.
-	// os.Exit(status)
-	fmt.Printf("godog test run status was %d", status)
-	os.Exit(0)
+	os.Exit(status)
 }
