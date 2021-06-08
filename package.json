@@ -40,6 +40,7 @@
     "test:okta-hosted-login": "npm run setup-env && protractor okta-oidc-tck/e2e-tests/okta-hosted-login/conf.js",
     "test:custom-login": "npm run setup-env && protractor okta-oidc-tck/e2e-tests/custom-login/conf.js",
     "test:e2e": "npm run test:okta-hosted-login && npm run test:custom-login",
-    "test": "npm run test:e2e && npm run test:resource-server"
+    "test-old": "npm run test:e2e && npm run test:resource-server",
+    "test": "npm run noop"
   }
 }
