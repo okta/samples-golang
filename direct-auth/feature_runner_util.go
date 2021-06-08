@@ -40,11 +40,11 @@ func defaultInterval() time.Duration {
 }
 
 func claims() map[string]string {
-	claimsJSON := os.Getenv("CLAIMS")
+	claimsJSON := os.Getenv("OKTA_IDX_CLAIMS")
 	claims := map[string]string{}
 	err := json.Unmarshal([]byte(claimsJSON), &claims)
 	if err != nil {
-		fmt.Printf("unable to unmarshal env var CLAIMS %q\n", claimsJSON)
+		fmt.Printf("unable to unmarshal env var OKTA_IDX_CLAIMS %q\n", claimsJSON)
 		return map[string]string{}
 	}
 	return claims
@@ -147,11 +147,11 @@ func (th *TestHarness) loginToApplication() error {
 		return err
 	}
 
-	if err = th.entersText(`input[name="identifier"]`, os.Getenv("USER_NAME")); err != nil {
+	if err = th.entersText(`input[name="identifier"]`, os.Getenv("OKTA_IDX_USER_NAME")); err != nil {
 		return err
 	}
 
-	if err = th.entersText(`input[name="password"]`, os.Getenv("PASSWORD")); err != nil {
+	if err = th.entersText(`input[name="password"]`, os.Getenv("OKTA_IDX_PASSWORD")); err != nil {
 		return err
 	}
 
