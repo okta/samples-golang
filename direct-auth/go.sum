@@ -186,6 +186,8 @@ github.com/okta/okta-idx-golang v0.0.0-20210602072233-7c35ed87bfa1 h1:cna4q6l7ZQ
 github.com/okta/okta-idx-golang v0.0.0-20210602072233-7c35ed87bfa1/go.mod h1:h+cnPj4zH6JpdNv2+llAvTKNA3UL8ySofhJ9QVT6xoc=
 github.com/okta/okta-idx-golang v0.0.0-20210602213539-57c63b6540a2 h1:JHSWUhNoYHHk0t16mqd0VPNhQoq3zf3OHH2VanyS6vE=
 github.com/okta/okta-idx-golang v0.0.0-20210602213539-57c63b6540a2/go.mod h1:h+cnPj4zH6JpdNv2+llAvTKNA3UL8ySofhJ9QVT6xoc=
+github.com/okta/okta-idx-golang v0.0.0-20210608022047-682e1df5adf9 h1:AnNEFGhFqglWceKoRJ+i9awCI/r9G1v3UpRLN/GouA4=
+github.com/okta/okta-idx-golang v0.0.0-20210608022047-682e1df5adf9/go.mod h1:h+cnPj4zH6JpdNv2+llAvTKNA3UL8ySofhJ9QVT6xoc=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/patrickmn/go-cache v2.1.0+incompatible h1:HRMgzkcYKYpi3C8ajMPV8OFXaaRUnok+kx1WdO15EQc=
 github.com/patrickmn/go-cache v2.1.0+incompatible/go.mod h1:3Qf8kWWT7OJRJbdiICTKqZju1ZixQ/KpMGzzAfe6+WQ=
