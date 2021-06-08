@@ -25,15 +25,21 @@
     "wait-on": "^5.2.0"
   },
   "scripts": {
-    "test": "npm run test:e2e && npm run test:resource-server",
-    "test:e2e": "npm run test:okta-hosted-login && npm run test:custom-login",
+    "__________utils__________":"",
+    "noop": "echo 'no-op'",
     "setup-env": "node scripts/setup-env.js",
-    "okta-hosted-login-server": "cd okta-hosted-login && go run main.go",
-    "test:okta-hosted-login": "npm run setup-env && protractor okta-oidc-tck/e2e-tests/okta-hosted-login/conf.js",
+    "pretest": "node ./scripts/update-se-drivers.js && npm run setup-env",
+
+    "__________examples_______":"",
     "custom-login-server": "cd custom-login && go run main.go",
-    "test:custom-login": "npm run setup-env && protractor okta-oidc-tck/e2e-tests/custom-login/conf.js",
+    "okta-hosted-login-server": "cd okta-hosted-login && go run main.go",
     "resource-server": "cd resource-server && go run main.go",
+
+    "__________tests [FIXME]__":"",
     "test:resource-server": "npm run setup-env && jasmine okta-oidc-tck/resource-server/specs/okta-resource-server-spec.js",
-    "pretest": "node ./scripts/update-se-drivers.js && npm run setup-env"
+    "test:okta-hosted-login": "npm run setup-env && protractor okta-oidc-tck/e2e-tests/okta-hosted-login/conf.js",
+    "test:custom-login": "npm run setup-env && protractor okta-oidc-tck/e2e-tests/custom-login/conf.js",
+    "test:e2e": "npm run test:okta-hosted-login && npm run test:custom-login",
+    "test": "npm run test:e2e && npm run test:resource-server"
   }
 }
