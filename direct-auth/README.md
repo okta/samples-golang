@@ -27,14 +27,16 @@ These Examples are:
 
 Run the application with the go run command. 
 
-The application can find its Okta config variables in `$HOME/.okta/okta.yaml`.
-Or it can use the following environment variables for the configuration.
+The application can find its Okta config variables in `$HOME/.okta/okta.yaml`
+and/or it can use the environment variables for the configuration.
 
-* `CLIENT_ID` - The Okta application client ID (string)
-* `CLIENT_SECRET` - The Okta application client secret (string)
-* `ISSUER` - Oauth2 URI to the Okta organization (string) e.g. "https://test123.okta.com/oauth2/"
-* `SCOPES` - Oauth scopes, comma separated values (string) e.g. "openid,profile,email,offline_access"
-* `REDIRECT_URI` - The URI to redirect the application to after authentication (string)
+| Yaml Path             | Environment Key       | Description                                                                  |
+|-----------------------|-----------------------|------------------------------------------------------------------------------|
+| okta.idx.issuer       | OKTA_IDX_ISSUER       | The issuer of the authorization server used for authentication               |
+| okta.idx.clientId     | OKTA_IDX_CLIENTID     | The client ID of the Okta Application.                                       |
+| okta.idx.clientSecret | OKTA_IDX_CLIENTSECRET | The client secret of the Okta Application Required with confidential clients |
+| okta.idx.scopes       | OKTA_IDX_SCOPES       | The scopes requested for the access token                                    |
+| okta.idx.redirectUri  | OKTA_IDX_REDIRECTURI  | The URI to redirect the application to after authentication (optional)       |
 
 ```
 go run main.go
@@ -73,7 +75,8 @@ environment variables are utilized for the test user in the selenium tests.
 * `DEBUG=true` - Triggers debug loglines from the godog harness to be emitted
 
 ```
-# CLIENT_ID, CLIENT_SECRET, ISSUER, SCOPES, REDIRECT_URI have been
+# OKTA_IDX_ISSUER, OKTA_IDX_CLIENTID, OKTA_IDX_CLIENTSECRET,
+# OKTA_IDX_SCOPES, OKTA_IDX_REDIRECTURI have been
 # exported into the shell or are set in the $HOME/.okta/okta.yaml file
 
 $ export CLAIMS='{"email":"tester@okta.com","email_verified":"","family_name":"Er","given_name":"Test","locale":"en-US","name":"TestEr","preferred_username":"tester@okta.com","sub":"00abcdefghijklmnopqr","updated_at":"","zoneinfo":"America/Los_Angeles"}'
