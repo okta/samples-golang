@@ -19,7 +19,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -58,7 +57,6 @@ func ReadConfig(config interface{}, opts ...viper.DecoderConfigOption) error {
 	v.AddConfigPath("$HOME/.okta/")                    // path to look for the config file in
 	v.AddConfigPath(".")                               // path to look for config in the working directory
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_")) // replace default viper delimiter for env vars
-	v.AutomaticEnv()
 	v.SetTypeByDefaultValue(true)
 	err := v.ReadInConfig()
 	if err != nil {
@@ -68,25 +66,26 @@ func ReadConfig(config interface{}, opts ...viper.DecoderConfigOption) error {
 		}
 	}
 	err = v.Unmarshal(config, opts...)
-	c := config.(*Config)
-	// FIXME correct the way we are using viper with env vars
-	var val string
-	if val = os.Getenv("CLIENT_ID"); val != "" {
-		c.Okta.IDX.ClientID = val
-	}
-	if val = os.Getenv("CLIENT_SECRET"); val != "" {
-		c.Okta.IDX.ClientSecret = val
-	}
-	if val = os.Getenv("ISSUER"); val != "" {
-		c.Okta.IDX.Issuer = val
-	}
-	if val = os.Getenv("SCOPES"); val != "" {
-		c.Okta.IDX.Scopes = strings.Split(val, ",")
-	}
-	if val = os.Getenv("REDIRECT_URI"); val != "" {
-		c.Okta.IDX.RedirectURI = val
-	}
 
+	v.SetEnvPrefix("OKTA_IDX")
+	v.AutomaticEnv()
+
+	c := config.(*Config)
+	if c.Okta.IDX.ClientID == "" {
+		c.Okta.IDX.ClientID = fmt.Sprintf("%v", v.Get("CLIENTID"))
+	}
+	if c.Okta.IDX.ClientSecret == "" {
+		c.Okta.IDX.ClientSecret = fmt.Sprintf("%v", v.Get("CLIENTSECRET"))
+	}
+	if c.Okta.IDX.Issuer == "" {
+		c.Okta.IDX.Issuer = fmt.Sprintf("%v", v.Get("ISSUER"))
+	}
+	if len(c.Okta.IDX.Scopes) == 0 {
+		c.Okta.IDX.Scopes = strings.Split(fmt.Sprintf("%v", v.Get("SCOPES")), ",")
+	}
+	if c.Okta.IDX.RedirectURI == "" {
+		c.Okta.IDX.RedirectURI = fmt.Sprintf("%v", v.Get("REDIRECTURI"))
+	}
 	if err != nil {
 		return fmt.Errorf("failed to parse configuration: %w", err)
 	}
