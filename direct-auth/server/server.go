@@ -87,15 +87,6 @@ func (s *Server) Session() *sessions.CookieStore {
 	return sessionStore
 }
 
-func (s *Server) Stop() {
-	if s.svc != nil {
-		err := s.svc.Shutdown(context.TODO())
-		if err != nil {
-			fmt.Printf("error shutting down server: %+v\n", err)
-		}
-	}
-}
-
 func (s *Server) Address() string {
 	return s.address
 }
