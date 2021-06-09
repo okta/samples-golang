@@ -115,6 +115,7 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`Root Page shows links to the Entry Points`, th.checkEntryPoints)
 	ctx.Step(`logs in to the Application`, th.loginToApplication)
 	ctx.Step(`sees a table with the claims`, th.seesClaimsTable)
+	ctx.Step(`doesn't see a table with the claims`, th.doesntSeeClaimsTable)
 	ctx.Step(`sees a logout button`, th.seesLogoutButton)
 	ctx.Step(`clicks the logout button`, th.clicksLogoutButton)
 	ctx.Step(`is logged out`, th.isLoggedOut)

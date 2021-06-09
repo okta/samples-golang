@@ -199,6 +199,27 @@ func (th *TestHarness) seesClaimsTable() error {
 	return nil
 }
 
+func (th *TestHarness) doesntSeeClaimsTable() error {
+	debug("doesntSeeClaimsTable")
+
+	claims := claims()
+
+	for claim, value := range claims {
+		keyID := fmt.Sprintf("%s-key", claim)
+		err := th.doesntSeeElementIDWithValue(keyID, claim)
+		if err != nil {
+			return err
+		}
+
+		valID := fmt.Sprintf("%s-value", claim)
+		if err = th.doesntSeeElementIDWithValue(valID, value); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (th *TestHarness) seesLogoutButton() error {
 	return th.seesElementWithText(`button[type="submit"]`, "Logout")
 }
@@ -358,6 +379,31 @@ func (th *TestHarness) seesElementIDWithValue(elementID, text string) error {
 
 		return true, nil
 	}, defaultTimeout(), defaultInterval())
+
+	return err
+}
+
+func (th *TestHarness) doesntSeeElementIDWithValue(elementID, text string) error {
+	debug(fmt.Sprintf("doesntSeeElementIDWithValue %q %q\n", elementID, text))
+	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elems, err := th.wd.FindElements(selenium.ByID, text)
+		if err != nil {
+			return false, nil
+		}
+		if len(elems) != 0 {
+			return false, fmt.Errorf("didn't expect to find element id %q with text %q in page but found %d elems", elementID, text, len(elems))
+		}
+
+		return true, nil
+	}, time.Duration(time.Millisecond*50), defaultInterval())
+
+	if err == nil {
+		return nil
+	}
+
+	if matched, _ := regexp.MatchString("timeout", err.Error()); matched {
+		return nil
+	}
 
 	return err
 }
