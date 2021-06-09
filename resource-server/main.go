@@ -58,7 +58,6 @@ func ApiMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(mess)
-
 }
 
 type Message struct {
@@ -88,7 +87,6 @@ func isAuthenticated(r *http.Request) bool {
 	}
 
 	_, err := jv.New().VerifyAccessToken(bearerToken)
-
 	if err != nil {
 		return false
 	}

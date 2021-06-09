@@ -1,4 +1,4 @@
-module github.com/okta/samples-golang/self-hosted
+module github.com/okta/samples-golang/identity-engine/embedded-sign-in-widget
 
 go 1.14
 

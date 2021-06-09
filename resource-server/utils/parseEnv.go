@@ -8,10 +8,10 @@ import (
 )
 
 func ParseEnvironment() {
-	//useGlobalEnv := true
+	// useGlobalEnv := true
 	if _, err := os.Stat(".env"); os.IsNotExist(err) {
 		log.Printf("Environment Variable file (.env) is not present.  Relying on Global Environment Variables")
-		//useGlobalEnv = false
+		// useGlobalEnv = false
 	}
 
 	setEnvVariable("CLIENT_ID", os.Getenv("CLIENT_ID"))
@@ -32,8 +32,8 @@ func ParseEnvironment() {
 		log.Printf("Could not resolve a ISSUER environment variable.")
 		os.Exit(1)
 	}
-
 }
+
 func setEnvVariable(env string, current string) {
 	if current != "" {
 		return
