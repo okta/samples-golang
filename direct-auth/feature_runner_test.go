@@ -13,15 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package main
 
 import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/cucumber/godog"
 	"github.com/cucumber/messages-go/v10"
@@ -37,6 +40,7 @@ type TestHarness struct {
 }
 
 func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
+	rand.Seed(time.Now().UnixNano())
 	ctx.BeforeSuite(func() {
 		cfg := &config.Config{
 			Testing: true,
@@ -115,6 +119,19 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`clicks the logout button`, th.clicksLogoutButton)
 	ctx.Step(`is logged out`, th.isLoggedOut)
 	ctx.Step(`is redirected back to the Root View`, th.isRootView)
+
+	ctx.Step(`navigates to the Password Recovery View`, th.navigatesToThePasswordRecoveryView)
+	ctx.Step(`inputs correct Email`, th.inputsCorrectEmail)
+	ctx.Step(`submits the recovery form`, th.submitsTheRecoveryForm)
+	ctx.Step(`sees a page to input the code`, th.seesPageToInputTheCode)
+	ctx.Step(`fills in the correct code`, th.fillsInTheCorrectCode)
+	ctx.Step(`submits the code form`, th.submitsTheCodeForm)
+	ctx.Step(`sees a page to set new password`, th.seesPageToSetNewPassword)
+	ctx.Step(`fills a password that fits within the password policy`, th.fillsPassword)
+	ctx.Step(`she submits new password form`, th.submitsNewPassword)
+	ctx.Step(`is redirected back to the Root View`, th.isRootView)
+	ctx.Step(`inputs incorrect Email`, th.inputsIncorrectEmail)
+	ctx.Step(`^she sees a message "([^"]*)"$`, th.noAccountError)
 }
 
 func TestMain(m *testing.M) {

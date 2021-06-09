@@ -11,7 +11,7 @@ information.
 
 This Sample Application will show you the best practices for integrating
 Authentication into your app using [Okta's Identity
-Engine](https://developer.okta.com/docs/concepts/ie-intro/). Specifically, this 
+Engine](https://developer.okta.com/docs/concepts/ie-intro/). Specifically, this
 application will cover some basic needed use cases to get you up and running
 quickly with Okta.
 
@@ -25,7 +25,7 @@ These Examples are:
 
 ## Installation & Running The App
 
-Run the application with the go run command. 
+Run the application with the go run command.
 
 The application can find its Okta config variables in `$HOME/.okta/okta.yaml`
 and/or it can use the environment variables for the configuration.
@@ -64,16 +64,18 @@ $ selenium-server -port 4444
 
 Then run the tests in a separate shell.
 
-Set all of the claim attributes from `/userinfo` that should be checked into a
-JSON formated string environment variabled called `OKTA_IDX_CLAIMS`. Also,
-these environment variables are utilized for the test user in the selenium
-tests.
+Set all the claim attributes from `/userinfo` that should be checked into a
+JSON formatted string environment variable called `OKTA_IDX_CLAIMS`. Also, these
+environment variables are utilized for the test user in the selenium tests.
 
 * `OKTA_IDX_USER_NAME` - The test user that the features will be run as (string)
 * `OKTA_IDX_PASSWORD` - The test users's password (string)
+* `OKTA_IDX_USER_NAME_RESET` - The test user for reset password flow (string)
 * `OKTA_IDX_CLAIMS` - Name/value JSON map of claims that will be checked (string)
 * `SELENIUM_URL` - The Selenium server's URL (string)
 * `DEBUG=true` - Triggers debug loglines from the godog harness to be emitted
+* `A18N_API_URL` - REST API URL for receiving MFA verification codes
+* `A18N_API_KEY` - REST API Key
 
 ```
 # OKTA_IDX_ISSUER, OKTA_IDX_CLIENTID, OKTA_IDX_CLIENTSECRET,

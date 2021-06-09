@@ -58,6 +58,8 @@ func ReadConfig(config interface{}, opts ...viper.DecoderConfigOption) error {
 	v.AddConfigPath(".")                               // path to look for config in the working directory
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_")) // replace default viper delimiter for env vars
 	v.SetTypeByDefaultValue(true)
+	v.SetEnvPrefix("OKTA_IDX")
+	v.AutomaticEnv()
 	err := v.ReadInConfig()
 	if err != nil {
 		var vErr viper.ConfigFileNotFoundError
@@ -66,9 +68,6 @@ func ReadConfig(config interface{}, opts ...viper.DecoderConfigOption) error {
 		}
 	}
 	err = v.Unmarshal(config, opts...)
-
-	v.SetEnvPrefix("OKTA_IDX")
-	v.AutomaticEnv()
 
 	c := config.(*Config)
 	if c.Okta.IDX.ClientID == "" {
