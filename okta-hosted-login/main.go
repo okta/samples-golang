@@ -16,13 +16,14 @@ import (
 	oktaUtils "github.com/okta/samples-golang/okta-hosted-login/utils"
 )
 
-var tpl *template.Template
-var sessionStore = sessions.NewCookieStore([]byte("okta-hosted-login-session-store"))
-var state = "ApplicationState"
-var nonce = "NonceNotSetYet"
+var (
+	tpl          *template.Template
+	sessionStore = sessions.NewCookieStore([]byte("okta-hosted-login-session-store"))
+	state        = "ApplicationState"
+	nonce        = "NonceNotSetYet"
+)
 
 func init() {
-
 	tpl = template.Must(template.ParseGlob("templates/*"))
 }
 
@@ -165,7 +166,6 @@ func exchangeCode(code string, r *http.Request) Exchange {
 	json.Unmarshal(body, &exchange)
 
 	return exchange
-
 }
 
 func isAuthenticated(r *http.Request) bool {
@@ -213,7 +213,6 @@ func verifyToken(t string) (*verifier.Jwt, error) {
 	}
 
 	result, err := jv.New().VerifyIdToken(t)
-
 	if err != nil {
 		return nil, fmt.Errorf("%s", err)
 	}

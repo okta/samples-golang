@@ -62,7 +62,6 @@ func NewServer(c *config.Config) *Server {
 		idx.WithIssuer(c.Okta.IDX.Issuer),
 		idx.WithScopes(c.Okta.IDX.Scopes),
 		idx.WithRedirectURI(c.Okta.IDX.RedirectURI))
-
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -815,19 +814,24 @@ func (s *Server) handlePasswordReset(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatalf("could not get store: %s", err)
 	}
-
-	ir := &idx.IdentifyRequest{
-		Identifier: r.FormValue("identifier"),
+	invEmail, ok := s.ViewData["InvalidEmail"]
+	var rpr *idx.ResetPasswordResponse
+	if !ok || !invEmail.(bool) {
+		ir := &idx.IdentifyRequest{
+			Identifier: r.FormValue("identifier"),
+		}
+		var err error
+		rpr, err = s.idxClient.InitPasswordReset(context.TODO(), ir)
+		if err != nil {
+			session.Values["Errors"] = err.Error()
+			session.Save(r, w)
+			http.Redirect(w, r, "/passwordRecovery", http.StatusFound)
+			return
+		}
+	} else {
+		tmp, _ := s.cache.Get("resetPasswordFlow")
+		rpr = tmp.(*idx.ResetPasswordResponse)
 	}
-
-	rpr, err := s.idxClient.InitPasswordReset(context.TODO(), ir)
-	if err != nil {
-		session.Values["Errors"] = err.Error()
-		session.Save(r, w)
-		http.Redirect(w, r, "/passwordRecovery", http.StatusFound)
-		return
-	}
-
 	// At this point, we expect to be able to send an email
 	// for a password reset, so we need to accept the code
 	// that was sent to the email address. If step does
@@ -838,15 +842,17 @@ func (s *Server) handlePasswordReset(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/passwordRecovery", http.StatusFound)
 		return
 	}
+	s.cache.Set("resetPasswordFlow", rpr, time.Minute*5)
 
 	rpr, err = rpr.VerifyEmail(context.TODO())
 	if err != nil {
+		s.ViewData["InvalidEmail"] = true
 		session.Values["Errors"] = err.Error()
 		session.Save(r, w)
 		http.Redirect(w, r, "/passwordRecovery", http.StatusFound)
 		return
 	}
-
+	s.ViewData["InvalidEmail"] = false
 	if !rpr.HasStep(idx.ResetPasswordStepEmailConfirmation) {
 		session.Values["Errors"] = "We encountered an unexpected error, please try again"
 		session.Save(r, w)
@@ -858,10 +864,6 @@ func (s *Server) handlePasswordReset(w http.ResponseWriter, r *http.Request) {
 
 	http.Redirect(w, r, "/passwordRecovery/code", http.StatusFound)
 	return
-}
-
-func (s *Server) passwordResetCode(w http.ResponseWriter, r *http.Request) {
-	s.render("resetPasswordCode.gohtml", w, r)
 }
 
 func (s *Server) handlePasswordResetCode(w http.ResponseWriter, r *http.Request) {
@@ -894,6 +896,10 @@ func (s *Server) handlePasswordResetCode(w http.ResponseWriter, r *http.Request)
 
 	http.Redirect(w, r, "/passwordRecovery/newPassword", http.StatusFound)
 	return
+}
+
+func (s *Server) passwordResetCode(w http.ResponseWriter, r *http.Request) {
+	s.render("resetPasswordCode.gohtml", w, r)
 }
 
 func (s *Server) passwordResetNewPassword(w http.ResponseWriter, r *http.Request) {
