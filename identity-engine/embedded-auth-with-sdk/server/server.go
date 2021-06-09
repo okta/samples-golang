@@ -34,8 +34,8 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/howeyc/fsnotify"
 	idx "github.com/okta/okta-idx-golang"
-	"github.com/okta/samples-golang/direct-auth/config"
-	"github.com/okta/samples-golang/direct-auth/views"
+	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/config"
+	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/views"
 	"github.com/patrickmn/go-cache"
 )
 

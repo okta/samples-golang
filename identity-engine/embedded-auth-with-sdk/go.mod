@@ -1,4 +1,4 @@
-module github.com/okta/samples-golang/direct-auth
+module github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk
 
 go 1.14
 

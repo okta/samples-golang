@@ -8,7 +8,7 @@ install:
 
 script:
   - npm test
-  - cd direct-auth/ && go test -v
+  - cd identity-engine/embedded-auth-with-sdk/ && go test -v
   
 env:
   global:
