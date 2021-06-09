@@ -30,6 +30,10 @@ import (
 	"github.com/tebeka/selenium"
 )
 
+const (
+	ERROR_DIV = `div[class="mx-auto py-4 px-2 my-2 w-full border-2 border-red-400 bg-red-100 "]`
+)
+
 func debug(text string) {
 	if os.Getenv("DEBUG") == "true" {
 		fmt.Println(text)
@@ -205,10 +209,9 @@ func (th *TestHarness) fillsInUsername() error {
 	return nil
 }
 
-func (th *TestHarness) seesNoAccountErrorMessage() error {
+func (th *TestHarness) matchErrorMessage(partialErrStr string) error {
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
-		elem, err := th.wd.FindElement(selenium.ByCSSSelector, `div[class="mx-auto py-4 px-2 my-2 w-full border-2 border-red-400 bg-red-100 "]`)
-		fmt.Printf("tick A %+v\n", err)
+		elem, err := th.wd.FindElement(selenium.ByCSSSelector, ERROR_DIV)
 		if err != nil {
 			return false, nil
 		}
@@ -218,18 +221,24 @@ func (th *TestHarness) seesNoAccountErrorMessage() error {
 			return false, nil
 		}
 
-		fmt.Printf("tick B %q %+v\n", text, err)
-		// There is no account with the Username TYPOmary@acme.com.
-		errorStr := "There is no account with the Username"
-		if matched, _ := regexp.MatchString(errorStr, text); !matched {
-			return false, fmt.Errorf("expected to find error message with %q message", errorStr)
-
+		if matched, _ := regexp.MatchString(partialErrStr, text); !matched {
+			return false, fmt.Errorf("expected to find error message with %q message", partialErrStr)
 		}
 
 		return true, nil
 	}, defaultTimeout(), defaultInterval())
 
 	return err
+}
+
+func (th *TestHarness) seesAuthFailedErrorMessage() error {
+	debug("seesAuthFailedErrorMessage")
+	return th.matchErrorMessage("Authentication failed")
+}
+
+func (th *TestHarness) seesNoAccountErrorMessage() error {
+	debug("seesNoAccountErrorMessage")
+	return th.matchErrorMessage("There is no account with the Username")
 }
 
 func (th *TestHarness) fillsInIncorrectUsername() error {
@@ -254,6 +263,20 @@ func (th *TestHarness) fillsInPassword() error {
 	}
 
 	if err := th.entersText(`input[name="password"]`, os.Getenv("OKTA_IDX_PASSWORD")); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (th *TestHarness) fillsInIncorrectPassword() error {
+	debug("fillsInIncorrectPassword")
+
+	if err := th.waitForLoginForm(); err != nil {
+		return err
+	}
+
+	if err := th.entersText(`input[name="password"]`, "wrong password"); err != nil {
 		return err
 	}
 
@@ -590,7 +613,7 @@ func (th *TestHarness) inputsIncorrectEmail() error {
 func (th *TestHarness) noAccountError(errorAcc string) error {
 	debug("noAccountError")
 	errorAcc += " " + strings.ReplaceAll(os.Getenv("OKTA_IDX_USER_NAME_RESET"), "@", "+1@") + "."
-	err := th.seesElementWithText(`div[class="mx-auto py-4 px-2 my-2 w-full border-2 border-red-400 bg-red-100"]`, errorAcc)
+	err := th.seesElementWithText(ERROR_DIV, errorAcc)
 	if err != nil {
 		return err
 	}
