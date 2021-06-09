@@ -34,6 +34,8 @@
     "custom-login-server": "cd custom-login && go run main.go",
     "okta-hosted-login-server": "cd okta-hosted-login && go run main.go",
     "resource-server": "cd resource-server && go run main.go",
+    "idx-embedded-auth-with-sdk": "cd identity-engine/embedded-auth-with-sdk/ && go run main.go",
+    "idx-embedded-sign-in-widget": "cd identity-engine/embedded-sign-in-widget/ && go run main.go",
 
     "__________tests [FIXME]__":"",
     "test:resource-server": "npm run setup-env && jasmine okta-oidc-tck/resource-server/specs/okta-resource-server-spec.js",
@@ -41,6 +43,7 @@
     "test:custom-login": "npm run setup-env && protractor okta-oidc-tck/e2e-tests/custom-login/conf.js",
     "test:e2e": "npm run test:okta-hosted-login && npm run test:custom-login",
     "test-old": "npm run test:e2e && npm run test:resource-server",
-    "test": "npm run noop"
+    "test:idx-embedded-auth-with-sdk": "cd identity-engine/embedded-auth-with-sdk/ && go test -v",
+    "test": "npm run test:idx-embedded-auth-with-sdk"
   }
 }
