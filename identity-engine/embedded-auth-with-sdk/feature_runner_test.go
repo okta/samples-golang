@@ -121,6 +121,12 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`is logged out`, th.isLoggedOut)
 	ctx.Step(`is redirected back to the Root View`, th.isRootView)
 
+	ctx.Step(`navigates to .* Basic Login`, th.navigateToBasicLogin)
+	ctx.Step(`fills in .* incorrect username`, th.fillsInIncorrectUsername)
+	ctx.Step(`fills in .* password`, th.fillsInPassword)
+	ctx.Step(`submits the Login form`, th.submitsLoginForm)
+	ctx.Step(`see an error message `, th.seesNoAccountErrorMessage)
+
 	ctx.Step(`navigates to the Password Recovery View`, th.navigatesToThePasswordRecoveryView)
 	ctx.Step(`inputs correct Email`, th.inputsCorrectEmail)
 	ctx.Step(`submits the recovery form`, th.submitsTheRecoveryForm)
