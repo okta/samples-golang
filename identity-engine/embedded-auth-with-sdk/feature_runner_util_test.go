@@ -30,6 +30,10 @@ import (
 	"github.com/tebeka/selenium"
 )
 
+const (
+	ERROR_DIV = `div[class="mx-auto py-4 px-2 my-2 w-full border-2 border-red-400 bg-red-100"]`
+)
+
 func debug(text string) {
 	if os.Getenv("DEBUG") == "true" {
 		fmt.Println(text)
@@ -71,17 +75,36 @@ func (th *TestHarness) navigateToTheRootView() error {
 	return th.waitForPageRender()
 }
 
+func (th *TestHarness) navigateToBasicLogin() error {
+	debug("navigateToBasicLogin")
+	loginURL := fmt.Sprintf("http://%s/login", th.server.Address())
+	err := th.wd.Get(loginURL)
+	if err != nil {
+		return err
+	}
+	return th.waitForPageRender()
+}
+
 func (th *TestHarness) isRootView() error {
 	debug("isRootView")
-	rootURL := fmt.Sprintf("http://%s/", th.server.Address())
+	return th.isView(fmt.Sprintf("http://%s/", th.server.Address()))
+}
 
-	url, err := th.wd.CurrentURL()
+func (th *TestHarness) isPasswordResetView() error {
+	debug("isPasswordRestView")
+	return th.isView(fmt.Sprintf("http://%s/passwordRecovery", th.server.Address()))
+}
+
+func (th *TestHarness) isView(url string) error {
+	debug("isView")
+
+	currentURL, err := th.wd.CurrentURL()
 	if err != nil {
 		return err
 	}
 
-	if rootURL != url {
-		return fmt.Errorf("isRootView expects %q url, finds %q url", rootURL, url)
+	if url != currentURL {
+		return fmt.Errorf("isView expects %q url, finds %q url", url, currentURL)
 	}
 
 	return nil
@@ -151,15 +174,15 @@ func (th *TestHarness) loginToApplication() error {
 		return err
 	}
 
-	if err = th.entersText(`input[name="identifier"]`, os.Getenv("OKTA_IDX_USER_NAME")); err != nil {
+	if err = th.fillsInUsername(); err != nil {
 		return err
 	}
 
-	if err = th.entersText(`input[name="password"]`, os.Getenv("OKTA_IDX_PASSWORD")); err != nil {
+	if err = th.fillsInPassword(); err != nil {
 		return err
 	}
 
-	if err = th.clicksButtonWithText(`button[type="submit"]`, "Login"); err != nil {
+	if err = th.submitsLoginForm(); err != nil {
 		return err
 	}
 
@@ -169,6 +192,104 @@ func (th *TestHarness) loginToApplication() error {
 
 	text := fmt.Sprintf("Welcome, %s.", claimItem("name"))
 	return th.seesElementWithText(`html body h1`, text)
+}
+
+func (th *TestHarness) submitsLoginForm() error {
+	debug("submitsLoginForm")
+
+	if err := th.clicksButtonWithText(`button[type="submit"]`, "Login"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (th *TestHarness) fillsInUsername() error {
+	debug("fillsInUsername")
+
+	if err := th.waitForLoginForm(); err != nil {
+		return err
+	}
+
+	if err := th.entersText(`input[name="identifier"]`, os.Getenv("OKTA_IDX_USER_NAME")); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (th *TestHarness) matchErrorMessage(partialErrStr string) error {
+	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elem, err := th.wd.FindElement(selenium.ByCSSSelector, ERROR_DIV)
+		if err != nil {
+			return false, nil
+		}
+
+		text, err := elem.Text()
+		if err != nil {
+			return false, nil
+		}
+
+		if matched, _ := regexp.MatchString(partialErrStr, text); !matched {
+			return false, fmt.Errorf("expected to find error message with %q message", partialErrStr)
+		}
+
+		return true, nil
+	}, defaultTimeout(), defaultInterval())
+
+	return err
+}
+
+func (th *TestHarness) seesAuthFailedErrorMessage() error {
+	debug("seesAuthFailedErrorMessage")
+	return th.matchErrorMessage("Authentication failed")
+}
+
+func (th *TestHarness) seesNoAccountErrorMessage() error {
+	debug("seesNoAccountErrorMessage")
+	return th.matchErrorMessage("There is no account with the Username")
+}
+
+func (th *TestHarness) fillsInIncorrectUsername() error {
+	debug("fillsInIncorrectUsername")
+
+	if err := th.waitForLoginForm(); err != nil {
+		return err
+	}
+
+	if err := th.entersText(`input[name="identifier"]`, "TYPO"+os.Getenv("OKTA_IDX_USER_NAME")); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (th *TestHarness) fillsInPassword() error {
+	debug("fillsInPassword")
+
+	if err := th.waitForLoginForm(); err != nil {
+		return err
+	}
+
+	if err := th.entersText(`input[name="password"]`, os.Getenv("OKTA_IDX_PASSWORD")); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (th *TestHarness) fillsInIncorrectPassword() error {
+	debug("fillsInIncorrectPassword")
+
+	if err := th.waitForLoginForm(); err != nil {
+		return err
+	}
+
+	if err := th.entersText(`input[name="password"]`, "wrong password"); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (th *TestHarness) isLoggedOut() error {
@@ -199,13 +320,40 @@ func (th *TestHarness) seesClaimsTable() error {
 	return nil
 }
 
+func (th *TestHarness) doesntSeeClaimsTable() error {
+	debug("doesntSeeClaimsTable")
+
+	claims := claims()
+
+	for claim, value := range claims {
+		keyID := fmt.Sprintf("%s-key", claim)
+		err := th.doesntSeeElementIDWithValue(keyID, claim)
+		if err != nil {
+			return err
+		}
+
+		valID := fmt.Sprintf("%s-value", claim)
+		if err = th.doesntSeeElementIDWithValue(valID, value); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (th *TestHarness) seesLogoutButton() error {
+	debug("seesLogoutButton")
 	return th.seesElementWithText(`button[type="submit"]`, "Logout")
 }
 
 func (th *TestHarness) clicksLogoutButton() error {
-	result := th.clicksButtonWithText(`button[type="submit"]`, "Logout")
-	return result
+	debug("clicksLogoutButton")
+	return th.clicksButtonWithText(`button[type="submit"]`, "Logout")
+}
+
+func (th *TestHarness) clicksForgotPasswordButton() error {
+	debug("clicksForgotPasswordButton")
+	return th.clickLink("Forgot your password?")
 }
 
 func (th *TestHarness) seesElement(selector string) error {
@@ -362,6 +510,31 @@ func (th *TestHarness) seesElementIDWithValue(elementID, text string) error {
 	return err
 }
 
+func (th *TestHarness) doesntSeeElementIDWithValue(elementID, text string) error {
+	debug(fmt.Sprintf("doesntSeeElementIDWithValue %q %q\n", elementID, text))
+	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elems, err := th.wd.FindElements(selenium.ByID, text)
+		if err != nil {
+			return false, nil
+		}
+		if len(elems) != 0 {
+			return false, fmt.Errorf("didn't expect to find element id %q with text %q in page but found %d elems", elementID, text, len(elems))
+		}
+
+		return true, nil
+	}, time.Duration(time.Millisecond*50), time.Duration(time.Millisecond*50))
+
+	if err == nil {
+		return nil
+	}
+
+	if matched, _ := regexp.MatchString("timeout", err.Error()); matched {
+		return nil
+	}
+
+	return err
+}
+
 func (th *TestHarness) noop() error {
 	return nil
 }
@@ -455,7 +628,7 @@ func (th *TestHarness) inputsIncorrectEmail() error {
 func (th *TestHarness) noAccountError(errorAcc string) error {
 	debug("noAccountError")
 	errorAcc += " " + strings.ReplaceAll(os.Getenv("OKTA_IDX_USER_NAME_RESET"), "@", "+1@") + "."
-	err := th.seesElementWithText(`div[class="mx-auto py-4 px-2 my-2 w-full border-2 border-red-400 bg-red-100"]`, errorAcc)
+	err := th.seesElementWithText(ERROR_DIV, errorAcc)
 	if err != nil {
 		return err
 	}

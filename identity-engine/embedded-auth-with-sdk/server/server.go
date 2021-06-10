@@ -975,7 +975,7 @@ func (s *Server) parseTemplates() {
 
 	s.view = views.NewView(s.config, sessionStore)
 
-	s.tpl, err = t.Funcs(s.view.TemplateFuncs()).ParseGlob("views/*")
+	s.tpl, err = t.Funcs(s.view.TemplateFuncs()).ParseGlob("views/*.gohtml")
 
 	if err != nil {
 		log.Fatal(err)
