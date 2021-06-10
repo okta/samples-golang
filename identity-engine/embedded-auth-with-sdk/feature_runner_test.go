@@ -129,6 +129,8 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`see an error message.*There is no account with the Username`, th.seesNoAccountErrorMessage)
 	ctx.Step(`fills in (their|her|his) incorrect password`, th.fillsInIncorrectPassword)
 	ctx.Step(`see an error message.*Authentication failed`, th.seesAuthFailedErrorMessage)
+	ctx.Step(`clicks on the Forgot Password button`, th.clicksForgotPasswordButton)
+	ctx.Step(`is redirected to the Self Service Password Reset View`, th.isPasswordResetView)
 
 	ctx.Step(`navigates to the Password Recovery View`, th.navigatesToThePasswordRecoveryView)
 	ctx.Step(`inputs correct Email`, th.inputsCorrectEmail)

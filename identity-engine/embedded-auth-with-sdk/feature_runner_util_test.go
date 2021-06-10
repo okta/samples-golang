@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	ERROR_DIV = `div[class="mx-auto py-4 px-2 my-2 w-full border-2 border-red-400 bg-red-100 "]`
+	ERROR_DIV = `div[class="mx-auto py-4 px-2 my-2 w-full border-2 border-red-400 bg-red-100"]`
 )
 
 func debug(text string) {
@@ -87,15 +87,24 @@ func (th *TestHarness) navigateToBasicLogin() error {
 
 func (th *TestHarness) isRootView() error {
 	debug("isRootView")
-	rootURL := fmt.Sprintf("http://%s/", th.server.Address())
+	return th.isView(fmt.Sprintf("http://%s/", th.server.Address()))
+}
 
-	url, err := th.wd.CurrentURL()
+func (th *TestHarness) isPasswordResetView() error {
+	debug("isPasswordRestView")
+	return th.isView(fmt.Sprintf("http://%s/passwordRecovery", th.server.Address()))
+}
+
+func (th *TestHarness) isView(url string) error {
+	debug("isView")
+
+	currentURL, err := th.wd.CurrentURL()
 	if err != nil {
 		return err
 	}
 
-	if rootURL != url {
-		return fmt.Errorf("isRootView expects %q url, finds %q url", rootURL, url)
+	if url != currentURL {
+		return fmt.Errorf("isView expects %q url, finds %q url", url, currentURL)
 	}
 
 	return nil
@@ -333,12 +342,18 @@ func (th *TestHarness) doesntSeeClaimsTable() error {
 }
 
 func (th *TestHarness) seesLogoutButton() error {
+	debug("seesLogoutButton")
 	return th.seesElementWithText(`button[type="submit"]`, "Logout")
 }
 
 func (th *TestHarness) clicksLogoutButton() error {
-	result := th.clicksButtonWithText(`button[type="submit"]`, "Logout")
-	return result
+	debug("clicksLogoutButton")
+	return th.clicksButtonWithText(`button[type="submit"]`, "Logout")
+}
+
+func (th *TestHarness) clicksForgotPasswordButton() error {
+	debug("clicksForgotPasswordButton")
+	return th.clickLink("Forgot your password?")
 }
 
 func (th *TestHarness) seesElement(selector string) error {

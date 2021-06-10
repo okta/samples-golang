@@ -30,3 +30,8 @@ Feature: 1.1 Basic Login with Password Factor
     And she fills in her incorrect password
     And she submits the Login form
     Then she should see an error message "Authentication failed"
+
+  Scenario: 1.1.8 Mary clicks on the "Forgot Password Link"
+    Given Mary navigates to the Basic Login View
+    When she clicks on the Forgot Password button
+    Then she is redirected to the Self Service Password Reset View
