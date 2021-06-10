@@ -13,9 +13,7 @@
 
                   <form class="space-y-6" action="/login/factors/email" method="POST">
                     {{if ne .Errors ""}}
-                    <div class="mx-auto py-4 px-2 my-2 w-full border-2 border-red-400 bg-red-100 ">
-                    {{.Errors}}
-                    </div>
+                      {{template "_error" .Errors}}
                     {{end}}
                     <div>
                       <label for="code" class="block text-sm font-medium text-gray-700">
