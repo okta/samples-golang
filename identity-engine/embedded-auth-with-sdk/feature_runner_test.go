@@ -143,6 +143,12 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`clicks on the Forgot Password button`, th.clicksForgotPasswordButton)
 	ctx.Step(`is redirected to the Self Service Password Reset View`, th.isPasswordResetView)
 
+	ctx.Step(`navigates to .* Self Service Registration View`, th.navigateToSelfServiceRegistration)
+	ctx.Step(`fills (out|in) (their|her|his) First Name`, th.fillsInFirstName)
+	ctx.Step(`fills (out|in) (their|her|his) Last Name`, th.fillsInLastName)
+	ctx.Step(`fills (out|in) (their|her|his) Email`, th.fillsInEmail)
+	ctx.Step(`submits the registration form`, th.submitsRegistrationForm)
+
 	ctx.Step(`navigates to the Password Recovery View`, th.navigatesToThePasswordRecoveryView)
 	ctx.Step(`inputs correct Email`, th.inputsCorrectEmail)
 	ctx.Step(`submits the recovery form`, th.submitsTheRecoveryForm)

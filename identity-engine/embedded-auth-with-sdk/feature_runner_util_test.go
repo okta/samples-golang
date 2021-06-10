@@ -85,6 +85,17 @@ func (th *TestHarness) navigateToBasicLogin() error {
 	return th.waitForPageRender()
 }
 
+func (th *TestHarness) navigateToSelfServiceRegistration() error {
+	debug("navigateToSelfServiceRegistration")
+	rootURL := fmt.Sprintf("http://%s/register", th.server.Address())
+	err := th.wd.Get(rootURL)
+	if err != nil {
+		return err
+	}
+
+	return th.waitForPageRender()
+}
+
 func (th *TestHarness) isRootView() error {
 	debug("isRootView")
 	return th.isView(fmt.Sprintf("http://%s/", th.server.Address()))
@@ -163,6 +174,11 @@ func (th *TestHarness) waitForPasswordRecoveryForm() error {
 	return th.seesElement(`form[action="/passwordRecovery"]`)
 }
 
+func (th *TestHarness) waitForRegistrationForm() error {
+	debug("waitForRegistrationForm")
+	return th.seesElement(`form[action="/register"]`)
+}
+
 func (th *TestHarness) loginToApplication() error {
 	debug("loginToApplication")
 	err := th.clickLink("Sign In")
@@ -198,10 +214,16 @@ func (th *TestHarness) loginToApplication() error {
 	return th.seesElementWithText(`html body h1`, text)
 }
 
-func (th *TestHarness) submitsLoginForm() error {
-	debug("submitsLoginForm")
+type waitFor func() error
 
-	if err := th.clicksButtonWithText(`button[type="submit"]`, "Login"); err != nil {
+func (th *TestHarness) fillsInFormValue(selector, value string, waitForForm waitFor) error {
+	debug("fillsInForm")
+
+	if err := waitForForm(); err != nil {
+		return err
+	}
+
+	if err := th.entersText(selector, value); err != nil {
 		return err
 	}
 
@@ -210,16 +232,37 @@ func (th *TestHarness) submitsLoginForm() error {
 
 func (th *TestHarness) fillsInUsername() error {
 	debug("fillsInUsername")
+	return th.fillsInFormValue(`input[name="identifier"]`, os.Getenv("OKTA_IDX_USER_NAME"), th.waitForLoginForm)
+}
 
-	if err := th.waitForLoginForm(); err != nil {
-		return err
-	}
+func (th *TestHarness) fillsInIncorrectUsername() error {
+	debug("fillsInIncorrectUsername")
+	return th.fillsInFormValue(`input[name="identifier"]`, "TYPO"+os.Getenv("OKTA_IDX_USER_NAME"), th.waitForLoginForm)
+}
 
-	if err := th.entersText(`input[name="identifier"]`, os.Getenv("OKTA_IDX_USER_NAME")); err != nil {
-		return err
-	}
+func (th *TestHarness) fillsInPassword() error {
+	debug("fillsInPassword")
+	return th.fillsInFormValue(`input[name="password"]`, os.Getenv("OKTA_IDX_PASSWORD"), th.waitForLoginForm)
+}
 
-	return nil
+func (th *TestHarness) fillsInIncorrectPassword() error {
+	debug("fillsInIncorrectPassword")
+	return th.fillsInFormValue(`input[name="password"]`, "wrong password", th.waitForLoginForm)
+}
+
+func (th *TestHarness) fillsInFirstName() error {
+	debug("fillsInFirstName")
+	return th.fillsInFormValue(`input[name="firstName"]`, claimItem("given_name"), th.waitForRegistrationForm)
+}
+
+func (th *TestHarness) fillsInLastName() error {
+	debug("fillsInLastName")
+	return th.fillsInFormValue(`input[name="lastName"]`, claimItem("family_name"), th.waitForRegistrationForm)
+}
+
+func (th *TestHarness) fillsInEmail() error {
+	debug("fillsInEmail")
+	return th.fillsInFormValue(`input[name="email"]`, claimItem("email"), th.waitForRegistrationForm)
 }
 
 func (th *TestHarness) matchErrorMessage(partialErrStr string) error {
@@ -252,48 +295,6 @@ func (th *TestHarness) seesAuthFailedErrorMessage() error {
 func (th *TestHarness) seesNoAccountErrorMessage() error {
 	debug("seesNoAccountErrorMessage")
 	return th.matchErrorMessage("There is no account with the Username")
-}
-
-func (th *TestHarness) fillsInIncorrectUsername() error {
-	debug("fillsInIncorrectUsername")
-
-	if err := th.waitForLoginForm(); err != nil {
-		return err
-	}
-
-	if err := th.entersText(`input[name="identifier"]`, "TYPO"+os.Getenv("OKTA_IDX_USER_NAME")); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (th *TestHarness) fillsInPassword() error {
-	debug("fillsInPassword")
-
-	if err := th.waitForLoginForm(); err != nil {
-		return err
-	}
-
-	if err := th.entersText(`input[name="password"]`, os.Getenv("OKTA_IDX_PASSWORD")); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (th *TestHarness) fillsInIncorrectPassword() error {
-	debug("fillsInIncorrectPassword")
-
-	if err := th.waitForLoginForm(); err != nil {
-		return err
-	}
-
-	if err := th.entersText(`input[name="password"]`, "wrong password"); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (th *TestHarness) isLoggedOut() error {
@@ -567,12 +568,37 @@ func (th *TestHarness) inputsCorrectEmail() error {
 	return nil
 }
 
-func (th *TestHarness) submitsTheRecoveryForm() error {
-	debug("submitsTheRecoveryForm")
-	if err := th.clicksButtonWithText(`button[type="submit"]`, "Submit"); err != nil {
+func (th *TestHarness) submitsForm(selector, text string) error {
+	if err := th.clicksButtonWithText(selector, text); err != nil {
 		return err
 	}
-	return th.waitForPageRender()
+
+	return nil
+}
+
+func (th *TestHarness) submitsLoginForm() error {
+	debug("submitsLoginForm")
+	return th.submitsForm(`button[type="submit"]`, "Login")
+}
+
+func (th *TestHarness) submitsTheRecoveryForm() error {
+	debug("submitsTheRecoveryForm")
+	return th.submitsForm(`button[type="submit"]`, "Submit")
+}
+
+func (th *TestHarness) submitsRegistrationForm() error {
+	debug("submitsRegistrationForm")
+	return th.submitsForm(`button[type="submit"]`, "Register")
+}
+
+func (th *TestHarness) submitsTheCodeForm() error {
+	debug("submitsTheCodeForm")
+	return th.submitsForm(`button[type="submit"]`, "Submit")
+}
+
+func (th *TestHarness) submitsNewPassword() error {
+	debug("submitsNewPassword")
+	return th.submitsForm(`button[type="submit"]`, "Submit")
 }
 
 func (th *TestHarness) seesPageToInputTheCode() error {
@@ -592,14 +618,6 @@ func (th *TestHarness) fillsInTheCorrectCode() error {
 	return nil
 }
 
-func (th *TestHarness) submitsTheCodeForm() error {
-	debug("submitsTheCodeForm")
-	if err := th.clicksButtonWithText(`button[type="submit"]`, "Submit"); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (th *TestHarness) seesPageToSetNewPassword() error {
 	return th.seesElement(`form[action="/passwordRecovery/newPassword"]`)
 }
@@ -611,14 +629,6 @@ func (th *TestHarness) fillsPassword() error {
 		return err
 	}
 	if err := th.entersText(`input[name="confirmPassword"]`, p); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (th *TestHarness) submitsNewPassword() error {
-	debug("submitsNewPassword")
-	if err := th.clicksButtonWithText(`button[type="submit"]`, "Submit"); err != nil {
 		return err
 	}
 	return nil
