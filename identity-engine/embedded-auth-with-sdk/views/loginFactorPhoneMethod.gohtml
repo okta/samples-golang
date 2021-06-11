@@ -16,6 +16,17 @@
                       {{template "_error" .Errors}}
                     {{end}}
 
+                    {{if .InitialPhoneSetup}}
+                      <div>
+                        <label for="phoneNumber" class="block text-sm font-medium text-gray-700">
+                          Enter your phone number:
+                        </label>
+                        <div class="mt-1">
+                          <input id="phoneNumber" name="phoneNumber" type="text" required class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                      </div>
+                    {{end}}
+
                     <div class="sm:col-span-2">
                       <div class="max-w-lg">
                         <p class="text-sm text-gray-500">Please choose the method for this factor</p>
