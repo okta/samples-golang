@@ -30,8 +30,19 @@ import (
 	"github.com/cucumber/messages-go/v10"
 	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/config"
 	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/server"
+	flag "github.com/spf13/pflag"
 	"github.com/tebeka/selenium"
 )
+
+var godogOptions = godog.Options{
+	Format: "pretty", // "cucumber", "events", "junit", "pretty", "progress"
+}
+
+func init() {
+	// facilitates godog flags into test e.g.
+	// go test -v --godog.format=pretty --godog.tags=wip
+	godog.BindCommandLineFlags("godog.", &godogOptions)
+}
 
 type TestHarness struct {
 	server       *server.Server
@@ -147,17 +158,21 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 }
 
 func TestMain(m *testing.M) {
-	opts := godog.Options{
-		Format: "pretty", // "cucumber", "events", "junit", "pretty", "progress"
-	}
+	flag.Parse()
+	godogOptions.Paths = flag.Args()
 
 	th := &TestHarness{}
 	status := godog.TestSuite{
 		Name:                 "Golang Direct Auth sample feature tests",
 		TestSuiteInitializer: th.InitializeTestSuite,
 		ScenarioInitializer:  th.InitializeScenario,
-		Options:              &opts,
+		Options:              &godogOptions,
 	}.Run()
+
+	// Optional: Run `testing` package's logic besides godog.
+	if st := m.Run(); st > status {
+		status = st
+	}
 
 	os.Exit(status)
 }
