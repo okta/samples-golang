@@ -17,13 +17,16 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,10 +37,12 @@ const (
 	ERROR_DIV = `div[class="mx-auto py-4 px-2 my-2 w-full border-2 border-red-400 bg-red-100"]`
 )
 
-func debug(text string) {
-	if os.Getenv("DEBUG") == "true" {
-		fmt.Println(text)
+func a18nApiURL() string {
+	url := os.Getenv("A18N_API_URL")
+	if url == "" {
+		url = "https://api.a18n.help"
 	}
+	return url
 }
 
 func defaultTimeout() time.Duration {
@@ -64,8 +69,26 @@ func claimItem(key string) string {
 	return value
 }
 
+func randomString() string {
+	digits := "0123456789"
+	specials := "~=+%^*/()[]{}/!@#$?|"
+	all := "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+		"abcdefghijklmnopqrstuvwxyz" +
+		digits + specials
+	length := 12
+	buf := make([]byte, length)
+	buf[0] = digits[rand.Intn(len(digits))]
+	buf[1] = specials[rand.Intn(len(specials))]
+	for i := 2; i < length; i++ {
+		buf[i] = all[rand.Intn(len(all))]
+	}
+	rand.Shuffle(len(buf), func(i, j int) {
+		buf[i], buf[j] = buf[j], buf[i]
+	})
+	return string(buf)
+}
+
 func (th *TestHarness) navigateToTheRootView() error {
-	debug("navigateToTheRootView")
 	rootURL := fmt.Sprintf("http://%s/", th.server.Address())
 	err := th.wd.Get(rootURL)
 	if err != nil {
@@ -76,7 +99,6 @@ func (th *TestHarness) navigateToTheRootView() error {
 }
 
 func (th *TestHarness) navigateToBasicLogin() error {
-	debug("navigateToBasicLogin")
 	loginURL := fmt.Sprintf("http://%s/login", th.server.Address())
 	err := th.wd.Get(loginURL)
 	if err != nil {
@@ -86,7 +108,6 @@ func (th *TestHarness) navigateToBasicLogin() error {
 }
 
 func (th *TestHarness) navigateToSelfServiceRegistration() error {
-	debug("navigateToSelfServiceRegistration")
 	rootURL := fmt.Sprintf("http://%s/register", th.server.Address())
 	err := th.wd.Get(rootURL)
 	if err != nil {
@@ -97,18 +118,14 @@ func (th *TestHarness) navigateToSelfServiceRegistration() error {
 }
 
 func (th *TestHarness) isRootView() error {
-	debug("isRootView")
 	return th.isView(fmt.Sprintf("http://%s/", th.server.Address()))
 }
 
 func (th *TestHarness) isPasswordResetView() error {
-	debug("isPasswordRestView")
 	return th.isView(fmt.Sprintf("http://%s/passwordRecovery", th.server.Address()))
 }
 
 func (th *TestHarness) isView(url string) error {
-	debug("isView")
-
 	currentURL, err := th.wd.CurrentURL()
 	if err != nil {
 		return err
@@ -122,12 +139,10 @@ func (th *TestHarness) isView(url string) error {
 }
 
 func (th *TestHarness) waitForPageRender() error {
-	debug("waitForPageRender")
 	return th.seesElement(`html body h1`)
 }
 
 func (th *TestHarness) checkEntryPoints() error {
-	debug("cehckEntryPoints")
 	baseURL := fmt.Sprintf("http://%s", th.server.Address())
 	links := []struct {
 		text string
@@ -166,17 +181,18 @@ func (th *TestHarness) checkEntryPoints() error {
 }
 
 func (th *TestHarness) waitForLoginForm() error {
-	debug("waitForLoginForm")
 	return th.seesElement(`form[action="/login"]`)
 }
 
 func (th *TestHarness) waitForRegistrationForm() error {
-	debug("waitForRegistrationForm")
 	return th.seesElement(`form[action="/register"]`)
 }
 
+func (th *TestHarness) waitForEnrollPasswordForm() error {
+	return th.seesElement(`form[action="/enrollPassword"]`)
+}
+
 func (th *TestHarness) loginToApplication() error {
-	debug("loginToApplication")
 	err := th.clickLink("Sign In")
 	if err != nil {
 		return err
@@ -213,8 +229,6 @@ func (th *TestHarness) loginToApplication() error {
 type waitFor func() error
 
 func (th *TestHarness) fillsInFormValue(selector, value string, waitForForm waitFor) error {
-	debug("fillsInForm")
-
 	if err := waitForForm(); err != nil {
 		return err
 	}
@@ -227,38 +241,58 @@ func (th *TestHarness) fillsInFormValue(selector, value string, waitForForm wait
 }
 
 func (th *TestHarness) fillsInUsername() error {
-	debug("fillsInUsername")
 	return th.fillsInFormValue(`input[name="identifier"]`, os.Getenv("OKTA_IDX_USER_NAME"), th.waitForLoginForm)
 }
 
 func (th *TestHarness) fillsInIncorrectUsername() error {
-	debug("fillsInIncorrectUsername")
 	return th.fillsInFormValue(`input[name="identifier"]`, "TYPO"+os.Getenv("OKTA_IDX_USER_NAME"), th.waitForLoginForm)
 }
 
 func (th *TestHarness) fillsInPassword() error {
-	debug("fillsInPassword")
 	return th.fillsInFormValue(`input[name="password"]`, os.Getenv("OKTA_IDX_PASSWORD"), th.waitForLoginForm)
 }
 
 func (th *TestHarness) fillsInIncorrectPassword() error {
-	debug("fillsInIncorrectPassword")
 	return th.fillsInFormValue(`input[name="password"]`, "wrong password", th.waitForLoginForm)
 }
 
-func (th *TestHarness) fillsInFirstName() error {
-	debug("fillsInFirstName")
-	return th.fillsInFormValue(`input[name="firstName"]`, claimItem("given_name"), th.waitForRegistrationForm)
+func (th *TestHarness) fillsInSignUpFirstName() error {
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
+	return th.fillsInFormValue(`input[name="firstName"]`, th.currentProfile.GivenName, th.waitForRegistrationForm)
 }
 
-func (th *TestHarness) fillsInLastName() error {
-	debug("fillsInLastName")
-	return th.fillsInFormValue(`input[name="lastName"]`, claimItem("family_name"), th.waitForRegistrationForm)
+func (th *TestHarness) fillsInSignUpLastName() error {
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
+	return th.fillsInFormValue(`input[name="lastName"]`, th.currentProfile.FamilyName, th.waitForRegistrationForm)
 }
 
-func (th *TestHarness) fillsInEmail() error {
-	debug("fillsInEmail")
-	return th.fillsInFormValue(`input[name="email"]`, claimItem("email"), th.waitForRegistrationForm)
+func (th *TestHarness) fillsInSignUpEmail() error {
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
+	return th.fillsInFormValue(`input[name="email"]`, th.currentProfile.EmailAddress, th.waitForRegistrationForm)
+}
+
+func (th *TestHarness) fillsInSignUpPassword() error {
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
+	return th.fillsInFormValue(`input[name="newPassword"]`, th.currentProfile.Password, th.waitForEnrollPasswordForm)
+}
+
+func (th *TestHarness) fillsInSignUpConfirmPassword() error {
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
+	return th.fillsInFormValue(`input[name="confirmPassword"]`, th.currentProfile.Password, th.waitForEnrollPasswordForm)
+}
+
+func (th *TestHarness) submitsNewPasswordForm() error {
+	return th.clicksButtonWithText(`button[type="submit"]`, "Submit")
 }
 
 func (th *TestHarness) matchErrorMessage(partialErrStr string) error {
@@ -284,25 +318,20 @@ func (th *TestHarness) matchErrorMessage(partialErrStr string) error {
 }
 
 func (th *TestHarness) seesAuthFailedErrorMessage() error {
-	debug("seesAuthFailedErrorMessage")
 	return th.matchErrorMessage("Authentication failed")
 }
 
 func (th *TestHarness) seesNoAccountErrorMessage() error {
-	debug("seesNoAccountErrorMessage")
 	return th.matchErrorMessage("There is no account with the Username")
 }
 
 func (th *TestHarness) isLoggedOut() error {
-	debug("isLoggedOut")
 
 	text := fmt.Sprintf("Welcome, %s.", claimItem("name"))
 	return th.doesNotSeeElementWithText(`html body h1`, text)
 }
 
 func (th *TestHarness) seesClaimsTable() error {
-	debug("seesClaimsTable")
-
 	claims := claims()
 
 	for claim, value := range claims {
@@ -322,8 +351,6 @@ func (th *TestHarness) seesClaimsTable() error {
 }
 
 func (th *TestHarness) doesntSeeClaimsTable() error {
-	debug("doesntSeeClaimsTable")
-
 	claims := claims()
 
 	for claim, value := range claims {
@@ -343,22 +370,18 @@ func (th *TestHarness) doesntSeeClaimsTable() error {
 }
 
 func (th *TestHarness) seesLogoutButton() error {
-	debug("seesLogoutButton")
 	return th.seesElementWithText(`button[type="submit"]`, "Logout")
 }
 
 func (th *TestHarness) clicksLogoutButton() error {
-	debug("clicksLogoutButton")
 	return th.clicksButtonWithText(`button[type="submit"]`, "Logout")
 }
 
 func (th *TestHarness) clicksForgotPasswordButton() error {
-	debug("clicksForgotPasswordButton")
 	return th.clickLink("Forgot your password?")
 }
 
 func (th *TestHarness) seesElement(selector string) error {
-	debug(fmt.Sprintf("seesElement %q\n", selector))
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		if _, err := th.wd.FindElement(selenium.ByCSSSelector, selector); err != nil {
 			return false, nil
@@ -371,7 +394,6 @@ func (th *TestHarness) seesElement(selector string) error {
 }
 
 func (th *TestHarness) clickLink(text string) error {
-	debug(fmt.Sprintf("clickLink %q\n", text))
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		elem, err := th.wd.FindElement(selenium.ByLinkText, text)
 		if err != nil {
@@ -389,11 +411,7 @@ func (th *TestHarness) clickLink(text string) error {
 }
 
 func (th *TestHarness) entersText(selector, text string) error {
-	debug(fmt.Sprintf("entersText %q %q\n", selector, text))
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
-		// Sleep is a hack to get OSX/Selenium synched up for text input.
-		time.Sleep(500 * time.Millisecond)
-
 		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
 		if err != nil {
 			return false, nil
@@ -414,7 +432,6 @@ func (th *TestHarness) entersText(selector, text string) error {
 }
 
 func (th *TestHarness) seesElementWithText(selector, text string) error {
-	debug(fmt.Sprintf("seesElementWithText %q %q\n", selector, text))
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
 		if err != nil {
@@ -437,7 +454,6 @@ func (th *TestHarness) seesElementWithText(selector, text string) error {
 }
 
 func (th *TestHarness) doesNotSeeElementWithText(selector, text string) error {
-	debug(fmt.Sprintf("doesNotSeeElementWithText %q %q\n", selector, text))
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
 		if err != nil {
@@ -459,11 +475,7 @@ func (th *TestHarness) doesNotSeeElementWithText(selector, text string) error {
 }
 
 func (th *TestHarness) clicksButtonWithText(selector, text string) error {
-	debug(fmt.Sprintf("clicksButtonWithText %q %q\n", selector, text))
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
-		// Sleep is a hack to get OSX/Selenium synched up for text input.
-		time.Sleep(500 * time.Millisecond)
-
 		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
 		if err != nil {
 			return false, nil
@@ -489,7 +501,6 @@ func (th *TestHarness) clicksButtonWithText(selector, text string) error {
 }
 
 func (th *TestHarness) seesElementIDWithValue(elementID, text string) error {
-	debug(fmt.Sprintf("seesElementIDWithValue %q %q\n", elementID, text))
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		elem, err := th.wd.FindElement(selenium.ByID, elementID)
 		if err != nil {
@@ -512,7 +523,6 @@ func (th *TestHarness) seesElementIDWithValue(elementID, text string) error {
 }
 
 func (th *TestHarness) doesntSeeElementIDWithValue(elementID, text string) error {
-	debug(fmt.Sprintf("doesntSeeElementIDWithValue %q %q\n", elementID, text))
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		elems, err := th.wd.FindElements(selenium.ByID, text)
 		if err != nil {
@@ -541,7 +551,6 @@ func (th *TestHarness) noop() error {
 }
 
 func (th *TestHarness) navigatesToThePasswordRecoveryView() error {
-	debug("navigatesToThePasswordRecoveryView")
 	rootURL := fmt.Sprintf("http://%s/passwordRecovery", th.server.Address())
 	err := th.wd.Get(rootURL)
 	if err != nil {
@@ -551,7 +560,6 @@ func (th *TestHarness) navigatesToThePasswordRecoveryView() error {
 }
 
 func (th *TestHarness) inputsCorrectEmail() error {
-	debug("inputsCorrectEmail")
 	err := th.entersText(`input[name="identifier"]`, os.Getenv("OKTA_IDX_USER_NAME_RESET"))
 	if err != nil {
 		return err
@@ -568,38 +576,31 @@ func (th *TestHarness) submitsForm(selector, text string) error {
 }
 
 func (th *TestHarness) submitsLoginForm() error {
-	debug("submitsLoginForm")
 	return th.submitsForm(`button[type="submit"]`, "Login")
 }
 
 func (th *TestHarness) submitsTheRecoveryForm() error {
-	debug("submitsTheRecoveryForm")
 	return th.submitsForm(`button[type="submit"]`, "Submit")
 }
 
 func (th *TestHarness) submitsRegistrationForm() error {
-	debug("submitsRegistrationForm")
 	return th.submitsForm(`button[type="submit"]`, "Register")
 }
 
 func (th *TestHarness) submitsTheCodeForm() error {
-	debug("submitsTheCodeForm")
 	return th.submitsForm(`button[type="submit"]`, "Submit")
 }
 
 func (th *TestHarness) submitsNewPassword() error {
-	debug("submitsNewPassword")
 	return th.submitsForm(`button[type="submit"]`, "Submit")
 }
 
 func (th *TestHarness) seesPageToInputTheCode() error {
-	debug("seesPageToInputTheCode")
 	return th.seesElement(`form[action="/passwordRecovery/code"]`)
 }
 
 func (th *TestHarness) fillsInTheCorrectCode() error {
-	debug("fillsInTheCorrectCode")
-	code, err := verificationCode()
+	code, err := th.verificationCode()
 	if err != nil {
 		return fmt.Errorf("faild to find latest verification code for user %s: %v", os.Getenv("OKTA_IDX_USER_NAME_RESET"), err)
 	}
@@ -614,7 +615,6 @@ func (th *TestHarness) seesPageToSetNewPassword() error {
 }
 
 func (th *TestHarness) fillsPassword() error {
-	debug("fillsPassword")
 	p := randomString()
 	if err := th.entersText(`input[name="newPassword"]`, p); err != nil {
 		return err
@@ -626,7 +626,6 @@ func (th *TestHarness) fillsPassword() error {
 }
 
 func (th *TestHarness) inputsIncorrectEmail() error {
-	debug("inputsCorrectEmail")
 	randomString()
 	err := th.entersText(`input[name="identifier"]`, strings.ReplaceAll(os.Getenv("OKTA_IDX_USER_NAME_RESET"), "@", "+1@"))
 	if err != nil {
@@ -636,7 +635,6 @@ func (th *TestHarness) inputsIncorrectEmail() error {
 }
 
 func (th *TestHarness) noAccountError(errorAcc string) error {
-	debug("noAccountError")
 	errorAcc += " " + strings.ReplaceAll(os.Getenv("OKTA_IDX_USER_NAME_RESET"), "@", "+1@") + "."
 	err := th.seesElementWithText(ERROR_DIV, errorAcc)
 	if err != nil {
@@ -645,13 +643,31 @@ func (th *TestHarness) noAccountError(errorAcc string) error {
 	return nil
 }
 
-func verificationCode() (string, error) {
-	c := &http.Client{Timeout: time.Second * 60}
-	url := os.Getenv("A18N_API_URL")
-	if url == "" {
-		url = "https://api.a18n.help"
+func (th *TestHarness) destroyCurrentProfile() error {
+	if th.currentProfile == nil {
+		return nil
 	}
-	profileURL, err := profileURL(c, url)
+
+	err := th.deleteProfile(th.currentProfile)
+	th.currentProfile = nil
+
+	return err
+}
+
+func (th *TestHarness) createCurrentProfile(name string) error {
+	profile, err := th.createProfile(name)
+	th.currentProfile = profile
+
+	return err
+}
+
+func (th *TestHarness) seesSetupListOfRequiredFactors() error {
+	// FIXME TOD
+	return nil
+}
+
+func (th *TestHarness) verificationCode() (string, error) {
+	profileURL, err := th.profileURL()
 	if err != nil {
 		return "", err
 	}
@@ -663,7 +679,7 @@ loop:
 		case <-timeout:
 			return "", fmt.Errorf("%s didn't receive email verification code (one minute timeout)", profileURL)
 		case <-checker:
-			code, err := latestVerificationCode(c, profileURL)
+			code, err := th.latestVerificationCode(profileURL)
 			if err != nil {
 				break loop
 			}
@@ -675,13 +691,13 @@ loop:
 	return "", fmt.Errorf("%s didn't receive email verification code", profileURL)
 }
 
-func latestVerificationCode(c *http.Client, profileURL string) (string, error) {
+func (th *TestHarness) latestVerificationCode(profileURL string) (string, error) {
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/email/latest", profileURL), nil)
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("x-api-key", os.Getenv("A18N_API_KEY"))
-	resp, err := c.Do(req)
+	resp, err := th.httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -705,7 +721,8 @@ func latestVerificationCode(c *http.Client, profileURL string) (string, error) {
 		return "", err
 	}
 	if time.Now().UTC().Sub(latestEmail.CreatedAt.UTC()) < time.Second*30 {
-		code := codeRegexp.FindString(latestEmail.Content)
+		verificationCodeRegexp := regexp.MustCompile(`[:\s][0-9]{6}`)
+		code := verificationCodeRegexp.FindString(latestEmail.Content)
 		if code != "" {
 			return strings.TrimSpace(code), nil
 		}
@@ -713,34 +730,78 @@ func latestVerificationCode(c *http.Client, profileURL string) (string, error) {
 	return "", nil
 }
 
-var codeRegexp = regexp.MustCompile(`[:\s][0-9]{6}`)
-
-func profileURL(c *http.Client, url string) (string, error) {
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/profile", url), nil)
+func (th *TestHarness) deleteProfile(profile *A18NProfile) error {
+	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v1/profile/%s", a18nApiURL(), profile.ProfileID), nil)
 	if err != nil {
-		return "", err
+		return err
 	}
 	req.Header.Set("x-api-key", os.Getenv("A18N_API_KEY"))
-	resp, err := c.Do(req)
+	resp, err := th.httpClient.Do(req)
 	if err != nil {
-		return "", err
+		return err
+	}
+	defer resp.Body.Close()
+
+	return nil
+}
+
+func (th *TestHarness) createProfile(name string) (*A18NProfile, error) {
+	data := fmt.Sprintf("{\"displayName\":%q}", name)
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/v1/profile", a18nApiURL()), bytes.NewBufferString(data))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("x-api-key", os.Getenv("A18N_API_KEY"))
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("Content-Length", strconv.Itoa(len(data)))
+	resp, err := th.httpClient.Do(req)
+	if err != nil {
+		return nil, err
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	var profiles struct {
-		Profiles []struct {
-			ProfileID    string `json:"profileId"`
-			PhoneNumber  string `json:"phoneNumber"`
-			EmailAddress string `json:"emailAddress"`
-			DisplayName  string `json:"displayName,omitempty"`
-			URL          string `json:"url"`
-		} `json:"profiles"`
-		Count int `json:"count"`
+	var profile A18NProfile
+	err = json.Unmarshal(body, &profile)
+	if err != nil {
+		return nil, err
 	}
+
+	givenFamily := strings.Split(name, " ")
+	profile.GivenName = givenFamily[0]
+	profile.FamilyName = givenFamily[1]
+	profile.Password = randomString()
+
+	return &profile, nil
+}
+
+func (th *TestHarness) profiles() (*A18NProfiles, error) {
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/profile", a18nApiURL()), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("x-api-key", os.Getenv("A18N_API_KEY"))
+	resp, err := th.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var profiles A18NProfiles
 	err = json.Unmarshal(body, &profiles)
+	if err != nil {
+		return nil, err
+	}
+	return &profiles, nil
+}
+
+func (th *TestHarness) profileURL() (string, error) {
+	profiles, err := th.profiles()
 	if err != nil {
 		return "", err
 	}
@@ -753,21 +814,16 @@ func profileURL(c *http.Client, url string) (string, error) {
 	return "", fmt.Errorf("profile with %s doesn't exist if REST API for receiving MFA verification codes", userName)
 }
 
-func randomString() string {
-	digits := "0123456789"
-	specials := "~=+%^*/()[]{}/!@#$?|"
-	all := "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
-		"abcdefghijklmnopqrstuvwxyz" +
-		digits + specials
-	length := 12
-	buf := make([]byte, length)
-	buf[0] = digits[rand.Intn(len(digits))]
-	buf[1] = specials[rand.Intn(len(specials))]
-	for i := 2; i < length; i++ {
-		buf[i] = all[rand.Intn(len(all))]
+func (th *TestHarness) testProfile() (*A18NProfile, error) {
+	profiles, err := th.profiles()
+	if err != nil {
+		return nil, err
 	}
-	rand.Shuffle(len(buf), func(i, j int) {
-		buf[i], buf[j] = buf[j], buf[i]
-	})
-	return string(buf)
+	displayName := "golang-idx-sdk"
+	for _, profile := range profiles.Profiles {
+		if profile.DisplayName == displayName {
+			return &profile, nil
+		}
+	}
+	return nil, fmt.Errorf("profile with %s doesn't exist if REST API for receiving MFA verification codes", displayName)
 }

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"strconv"
 	"testing"
@@ -44,10 +45,28 @@ func init() {
 	godog.BindCommandLineFlags("godog.", &godogOptions)
 }
 
+type A18NProfile struct {
+	ProfileID    string `json:"profileId"`
+	PhoneNumber  string `json:"phoneNumber"`
+	EmailAddress string `json:"emailAddress"`
+	DisplayName  string `json:"displayName"`
+	URL          string `json:"url"`
+	Password     string
+	GivenName    string
+	FamilyName   string
+}
+
+type A18NProfiles struct {
+	Profiles []A18NProfile `json:"profiles"`
+	Count    int           `json:"count"`
+}
+
 type TestHarness struct {
-	server       *server.Server
-	wd           selenium.WebDriver
-	capabilities selenium.Capabilities
+	server         *server.Server
+	wd             selenium.WebDriver
+	capabilities   selenium.Capabilities
+	currentProfile *A18NProfile
+	httpClient     *http.Client
 }
 
 func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
@@ -113,12 +132,22 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	})
 
 	ctx.AfterScenario(func(sc *messages.Pickle, err error) {
+		if err != nil {
+			fmt.Printf("AfterScenario error: %+v\n", err)
+		}
+
+		// always reset the given profile
+		err = th.destroyCurrentProfile()
+		if err != nil {
+			fmt.Printf("AfterScenario error destroying profile: %+v\n", err)
+		}
+
 		// always force a logout
 		logoutXHR := fmt.Sprintf("var xhr = new XMLHttpRequest(); xhr.open(\"POST\", \"/logout\", false); xhr.send(\"\");")
 		_, _ = th.wd.ExecuteScript(logoutXHR, nil)
 		err = th.wd.Quit()
 		if err != nil {
-			log.Panic(err)
+			fmt.Printf("AfterScenario error quiting web driver: %+v\n", err)
 		}
 	})
 
@@ -143,11 +172,16 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`clicks on the Forgot Password button`, th.clicksForgotPasswordButton)
 	ctx.Step(`is redirected to the Self Service Password Reset View`, th.isPasswordResetView)
 
+	ctx.Step(`there is a new sign up user named ([^"]*)$`, th.createCurrentProfile)
 	ctx.Step(`navigates to .* Self Service Registration View`, th.navigateToSelfServiceRegistration)
-	ctx.Step(`fills (out|in) (their|her|his) First Name`, th.fillsInFirstName)
-	ctx.Step(`fills (out|in) (their|her|his) Last Name`, th.fillsInLastName)
-	ctx.Step(`fills (out|in) (their|her|his) Email`, th.fillsInEmail)
+	ctx.Step(`fills (out|in) (their|her|his) First Name`, th.fillsInSignUpFirstName)
+	ctx.Step(`fills (out|in) (their|her|his) Last Name`, th.fillsInSignUpLastName)
+	ctx.Step(`fills (out|in) (their|her|his) Email`, th.fillsInSignUpEmail)
 	ctx.Step(`submits the registration form`, th.submitsRegistrationForm)
+	ctx.Step(`fills (out|in) (their|her|his) Password`, th.fillsInSignUpPassword)
+	ctx.Step(`confirms (their|her|his) Password`, th.fillsInSignUpConfirmPassword)
+	ctx.Step(`submits the set new password form`, th.submitsNewPasswordForm)
+	ctx.Step(`sees a list of required factors to setup`, th.seesSetupListOfRequiredFactors)
 
 	ctx.Step(`navigates to the Password Recovery View`, th.navigatesToThePasswordRecoveryView)
 	ctx.Step(`inputs correct Email`, th.inputsCorrectEmail)
@@ -167,7 +201,9 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 	godogOptions.Paths = flag.Args()
 
-	th := &TestHarness{}
+	th := &TestHarness{
+		httpClient: &http.Client{Timeout: time.Second * 60},
+	}
 	status := godog.TestSuite{
 		Name:                 "Golang Direct Auth sample feature tests",
 		TestSuiteInitializer: th.InitializeTestSuite,
