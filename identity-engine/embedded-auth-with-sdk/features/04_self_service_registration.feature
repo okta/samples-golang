@@ -23,15 +23,13 @@ Feature: 4.1 Self Service Registration with Email Activation and optional SMS
     When she fills out her Password
     And she confirms her Password
     And she submits the set new password form
-    # TODO
     Then she sees a list of required factors to setup
-    # TODO
-    # When she selects Email
-    # Then she sees a page to input a code
-    # When she inputs the correct code from her email
-    # Then she sees the list of optional factors (SMS)
-    # When she selects "Skip" on SMS
-    # Then she is redirected to the Root View
-    # And she sees a table with her profile info
-    # And the cell for the value of "email" is shown and contains her email
-    # And the cell for the value of "name" is shown and contains her first name and last name
+    When she selects Email
+    Then she sees a page to input a code
+    When she inputs the correct code from her email
+    Then she sees the list of optional factors (SMS)
+    When she selects "Skip" on SMS
+    Then she is redirected to the Root View
+    And she sees a table with her profile info
+    And the cell for the value of "email" is shown and contains her email
+    And the cell for the value of "name" is shown and contains her first name and last name
