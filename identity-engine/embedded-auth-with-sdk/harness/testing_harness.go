@@ -175,7 +175,32 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`fills (out|in) (their|her|his) Password`, th.fillsInSignUpPassword)
 	ctx.Step(`confirms (their|her|his) Password`, th.fillsInSignUpConfirmPassword)
 	ctx.Step(`submits the set new password form`, th.submitsNewPasswordForm)
-	ctx.Step(`sees a list of required factors to setup`, th.seesSetupListOfRequiredFactors)
+	ctx.Step(`sees (a|the) list of (optional|required) factors`, th.waitForEnrollFactorForm)
+	ctx.Step(`selects Email`, th.selectsEmailEnrollmentFactor)
+	ctx.Step(`selects Phone`, th.selectsPhoneEnrollmentFactor)
+	ctx.Step(`(he|she) selects "Skip"`, th.clicksSkip)
+	ctx.Step(`(he|she) sees a page to input a code`, th.waitForEnrollEmailForm)
+	ctx.Step(`(he|she) inputs the correct code from (her|his) email`, th.fillsInTheEnrollmentCode)
+	ctx.Step(`sees a list of (optional|required) factors`, th.waitForEnrollFactorForm)
+	ctx.Step(`is redirected to the Root View`, th.isRootView)
+	//`And she sees a table with her profile info
+	ctx.Step(`(he|she) sees a table with (her|his) profile info`, th.noop)
+	ctx.Step(`the cell for the value of "([^"]*)" is shown`, th.seesClaimsTableItemAndValueFromCurrentProfile)
+	/*
+	   When she fills out her Password
+	   And she confirms her Password
+	   And she submits the set new password form
+	   Then she sees a list of required factors to setup
+	   When she selects Email
+	   Then she sees a page to input a code
+	   When she inputs the correct code from her email
+	   Then she sees the list of optional factors (SMS)
+	   When she selects "Skip" on SMS
+	   Then she is redirected to the Root View
+	   And she sees a table with her profile info
+	   And the cell for the value of "email" is shown and contains her email
+	   And the cell for the value of "name" is shown and contains her first name and last name
+	*/
 
 	ctx.Step(`navigates to the Password Recovery View`, th.navigatesToThePasswordRecoveryView)
 	ctx.Step(`inputs correct Email`, th.inputsCorrectEmail)

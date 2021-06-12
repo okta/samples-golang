@@ -22,8 +22,9 @@ import (
 	"testing"
 
 	"github.com/cucumber/godog"
-	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/harness"
 	flag "github.com/spf13/pflag"
+
+	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/harness"
 )
 
 var godogOptions = godog.Options{

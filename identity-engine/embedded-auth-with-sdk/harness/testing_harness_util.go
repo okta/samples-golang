@@ -196,6 +196,27 @@ func (th *TestHarness) waitForEnrollPasswordForm() error {
 	return th.seesElement(`form[action="/enrollPassword"]`)
 }
 
+func (th *TestHarness) waitForEnrollFactorForm() error {
+	return th.seesElement(`form[action="/enrollFactor"]`)
+}
+
+func (th *TestHarness) waitForEnrollEmailForm() error {
+	return th.seesElement(`form[action="/enrollEmail"]`)
+}
+
+func (th *TestHarness) seesClaimsTableItemAndValueFromCurrentProfile(key string) error {
+	keyID := fmt.Sprintf("%s-value", key)
+	var value string
+	switch {
+	case key == "name":
+		value = th.currentProfile.DisplayName
+	case key == "email":
+		value = th.currentProfile.EmailAddress
+	}
+
+	return th.seesElementIDWithValue(keyID, value)
+}
+
 func (th *TestHarness) loginToApplication() error {
 	err := th.clickLink("Sign In")
 	if err != nil {
@@ -242,6 +263,27 @@ func (th *TestHarness) fillsInFormValue(selector, value string, waitForForm wait
 	}
 
 	return nil
+}
+
+func (th *TestHarness) clicksFormCheckItem(selector string, waitForForm waitFor) error {
+	if err := waitForForm(); err != nil {
+		return err
+	}
+
+	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
+		if err != nil {
+			return false, nil
+		}
+
+		if err = elem.Click(); err != nil {
+			return false, err
+		}
+
+		return true, nil
+	}, defaultTimeout(), defaultInterval())
+
+	return err
 }
 
 func (th *TestHarness) fillsInUsername() error {
@@ -503,6 +545,31 @@ func (th *TestHarness) clicksButtonWithText(selector, text string) error {
 
 	return err
 }
+func (th *TestHarness) clicksInputWithValue(selector, text string) error {
+	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
+		if err != nil {
+			return false, nil
+		}
+
+		value, err := elem.GetAttribute("value")
+		if err != nil {
+			return false, nil
+		}
+
+		if strings.TrimSpace(value) != text {
+			return false, nil
+		}
+
+		if err = elem.Click(); err != nil {
+			return false, err
+		}
+
+		return true, nil
+	}, defaultTimeout(), defaultInterval())
+
+	return err
+}
 
 func (th *TestHarness) seesElementIDWithValue(elementID, text string) error {
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
@@ -608,7 +675,11 @@ func (th *TestHarness) seesPageToInputTheCode() error {
 }
 
 func (th *TestHarness) fillsInTheCorrectCode() error {
-	code, err := th.verificationCode()
+	profileURL, err := th.profileURL()
+	if err != nil {
+		return err
+	}
+	code, err := th.verificationCode(profileURL)
 	if err != nil {
 		return fmt.Errorf("faild to find latest verification code for user %s: %v", os.Getenv("OKTA_IDX_USER_NAME_RESET"), err)
 	}
@@ -669,16 +740,38 @@ func (th *TestHarness) createCurrentProfile(name string) error {
 	return err
 }
 
-func (th *TestHarness) seesSetupListOfRequiredFactors() error {
-	// FIXME TOD
-	return nil
+func (th *TestHarness) selectsEmailEnrollmentFactor() error {
+	if err := th.clicksFormCheckItem(`input[name="push_email"]`, th.waitForEnrollFactorForm); err != nil {
+		return err
+	}
+
+	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
 }
 
-func (th *TestHarness) verificationCode() (string, error) {
-	profileURL, err := th.profileURL()
-	if err != nil {
-		return "", err
+func (th *TestHarness) selectsPhoneEnrollmentFactor() error {
+	if err := th.clicksFormCheckItem(`input[name="push_phone"]`, th.waitForEnrollFactorForm); err != nil {
+		return err
 	}
+
+	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
+}
+
+func (th *TestHarness) clicksSkip() error {
+	return th.clicksInputWithValue(`input[type="submit"]`, "Skip")
+}
+
+func (th *TestHarness) fillsInTheEnrollmentCode() error {
+	code, err := th.verificationCode(th.currentProfile.URL)
+	if err != nil {
+		return fmt.Errorf("faild to find latest verification code for user %s: %v", th.currentProfile.ProfileID, err)
+	}
+	if err = th.entersText(`input[name="code"]`, code); err != nil {
+		return err
+	}
+	return th.clicksButtonWithText(`button[type="submit"]`, "Submit")
+}
+
+func (th *TestHarness) verificationCode(profileURL string) (string, error) {
 	checker := time.Tick(time.Second * 5)
 	timeout := time.After(time.Minute)
 loop:
