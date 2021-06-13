@@ -36,6 +36,11 @@ import (
 	"github.com/tebeka/selenium"
 )
 
+const (
+	EMAIL_CODE_TYPE = "email"
+	SMS_CODE_TYPE   = "sms"
+)
+
 type A18NProfile struct {
 	ProfileID    string `json:"profileId"`
 	PhoneNumber  string `json:"phoneNumber"`
@@ -52,6 +57,29 @@ type A18NProfiles struct {
 	Profiles []A18NProfile `json:"profiles"`
 	Count    int           `json:"count"`
 }
+
+type A18NContent struct {
+	MessageID string    `json:"messageId"`
+	ProfileID string    `json:"profileId"`
+	CreatedAt time.Time `json:"createdAt"`
+	Content   string    `json:"content"`
+	URL       string    `json:"url"`
+}
+
+type A18NContentEmail struct {
+	A18NContent
+	ToAddress   string `json:"toAddress"`
+	FromAddress string `json:"fromAddress"`
+	Subject     string `json:"subject"`
+}
+
+type A18NContentSMS struct {
+	A18NContent
+	Sender   string `json:"sender"`
+	Receiver string `json:"receiver"`
+}
+
+// TODO: A18NContentVoice struct {
 
 type TestHarness struct {
 	server         *server.Server
@@ -164,6 +192,7 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	})
 
 	ctx.Step(`there is an existing user`, th.existingUser)
+	ctx.Step(`sleep ([^" ]+)`, th.debugSleep)
 
 	ctx.Step(`navigates to the Root View`, th.navigateToTheRootView)
 	ctx.Step(`Root Page shows links to the Entry Points`, th.checkEntryPoints)
@@ -206,24 +235,13 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`(he|she) inputs the correct code from (her|his) email`, th.fillsInTheEnrollmentCode)
 	ctx.Step(`sees a list of (optional|required) factors`, th.waitForEnrollFactorForm)
 	ctx.Step(`is redirected to the Root View`, th.isRootView)
-	//`And she sees a table with her profile info
 	ctx.Step(`(he|she) sees a table with (her|his) profile info`, th.noop)
 	ctx.Step(`the cell for the value of "([^"]*)" is shown`, th.seesClaimsTableItemAndValueFromCurrentProfile)
-	/*
-	   When she fills out her Password
-	   And she confirms her Password
-	   And she submits the set new password form
-	   Then she sees a list of required factors to setup
-	   When she selects Email
-	   Then she sees a page to input a code
-	   When she inputs the correct code from her email
-	   Then she sees the list of optional factors (SMS)
-	   When she selects "Skip" on SMS
-	   Then she is redirected to the Root View
-	   And she sees a table with her profile info
-	   And the cell for the value of "email" is shown and contains her email
-	   And the cell for the value of "name" is shown and contains her first name and last name
-	*/
+	ctx.Step(`(he|she) inputs a valid phone number`, th.fillsInTheEnrollmentPhone)
+	ctx.Step(`(he|she) selects "Receive a Code"`, th.fillsInReceiveSMSCode)
+	ctx.Step(`the screen changes to receive an input for a code`, th.waitForEnrollPhoneForm)
+	ctx.Step(`(he|she) inputs the correct code from (her|his) SMS`, th.fillsInTheEnrollmentCodeSMS)
+	ctx.Step(`(he|she) selects "Verify"`, th.clicksVerifySMSCode)
 
 	// 3.x.x
 	ctx.Step(`navigates to the Password Recovery View`, th.navigatesToThePasswordRecoveryView)
