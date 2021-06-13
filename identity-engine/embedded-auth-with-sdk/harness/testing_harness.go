@@ -17,17 +17,20 @@
 package harness
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/cucumber/godog"
 	"github.com/cucumber/messages-go/v10"
+	"github.com/okta/okta-sdk-golang/v2/okta"
 	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/config"
 	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/server"
 	"github.com/tebeka/selenium"
@@ -42,6 +45,7 @@ type A18NProfile struct {
 	Password     string
 	GivenName    string
 	FamilyName   string
+	UserID       string
 }
 
 type A18NProfiles struct {
@@ -55,6 +59,7 @@ type TestHarness struct {
 	capabilities   selenium.Capabilities
 	currentProfile *A18NProfile
 	httpClient     *http.Client
+	oktaClient     *okta.Client
 }
 
 func NewTestHarness() *TestHarness {
@@ -73,9 +78,22 @@ func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 		if err != nil {
 			log.Fatal(err)
 		}
-
+		orgUrl, err := url.Parse(cfg.Okta.IDX.Issuer)
+		if err != nil {
+			log.Fatal(err)
+		}
+		_, client, err := okta.NewClient(
+			context.Background(),
+			okta.WithOrgUrl(fmt.Sprintf("https://%s", orgUrl.Host)),
+			okta.WithToken(os.Getenv("OKTA_CLIENT_TOKEN")),
+			okta.WithHttpClientPtr(th.httpClient),
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
 		server := server.NewServer(cfg)
 		th.server = server
+		th.oktaClient = client
 		server.Run()
 	})
 
@@ -145,6 +163,8 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 		}
 	})
 
+	ctx.Step(`there is an existing user`, th.existingUser)
+
 	ctx.Step(`navigates to the Root View`, th.navigateToTheRootView)
 	ctx.Step(`Root Page shows links to the Entry Points`, th.checkEntryPoints)
 	ctx.Step(`logs in to the Application`, th.loginToApplication)
@@ -167,6 +187,9 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`is redirected to the Self Service Password Reset View`, th.isPasswordResetView)
 
 	ctx.Step(`there is a new sign up user named ([^"]*)$`, th.createCurrentProfile)
+	ctx.Step(`user is added to the org ([^"]*) phone number`, th.addUser)
+	ctx.Step(`user is assigned to the group ([^"]*)$`, th.addUserToGroup)
+
 	ctx.Step(`navigates to .* Self Service Registration View`, th.navigateToSelfServiceRegistration)
 	ctx.Step(`fills (out|in) (their|her|his) First Name`, th.fillsInSignUpFirstName)
 	ctx.Step(`fills (out|in) (their|her|his) Last Name`, th.fillsInSignUpLastName)
@@ -176,10 +199,10 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`confirms (their|her|his) Password`, th.fillsInSignUpConfirmPassword)
 	ctx.Step(`submits the set new password form`, th.submitsNewPasswordForm)
 	ctx.Step(`sees (a|the) list of (optional|required) factors`, th.waitForEnrollFactorForm)
-	ctx.Step(`selects Email`, th.selectsEmailEnrollmentFactor)
-	ctx.Step(`selects Phone`, th.selectsPhoneEnrollmentFactor)
+	ctx.Step(`selects Email`, th.selectsEmail)
+	ctx.Step(`selects Phone`, th.selectsPhone)
 	ctx.Step(`(he|she) selects "Skip"`, th.clicksSkip)
-	ctx.Step(`(he|she) sees a page to input a code`, th.waitForEnrollEmailForm)
+	ctx.Step(`(he|she) sees a page to input a code`, th.waitForEmailCodeForm)
 	ctx.Step(`(he|she) inputs the correct code from (her|his) email`, th.fillsInTheEnrollmentCode)
 	ctx.Step(`sees a list of (optional|required) factors`, th.waitForEnrollFactorForm)
 	ctx.Step(`is redirected to the Root View`, th.isRootView)
@@ -202,10 +225,11 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	   And the cell for the value of "name" is shown and contains her first name and last name
 	*/
 
+	// 3.x.x
 	ctx.Step(`navigates to the Password Recovery View`, th.navigatesToThePasswordRecoveryView)
 	ctx.Step(`inputs correct Email`, th.inputsCorrectEmail)
 	ctx.Step(`submits the recovery form`, th.submitsTheRecoveryForm)
-	ctx.Step(`sees a page to input the code`, th.seesPageToInputTheCode)
+	ctx.Step(`sees a page to input the code`, th.waitForEmailCodeForm)
 	ctx.Step(`fills in the correct code`, th.fillsInTheCorrectCode)
 	ctx.Step(`submits the code form`, th.submitsTheCodeForm)
 	ctx.Step(`sees a page to set new password`, th.seesPageToSetNewPassword)
@@ -213,5 +237,9 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`she submits new password form`, th.submitsNewPassword)
 	ctx.Step(`is redirected back to the Root View`, th.isRootView)
 	ctx.Step(`inputs incorrect Email`, th.inputsIncorrectEmail)
-	ctx.Step(`^she sees a message "([^"]*)"$`, th.noAccountError)
+	ctx.Step(`^she sees a message "([^"]*)"$`, th.seesErrorMessage)
+
+	// 6.x.x
+	ctx.Step(`fills in the incorrect code`, th.fillsInTheIncorrectCode)
+	ctx.Step(`sees a list of factors`, th.factorList)
 }

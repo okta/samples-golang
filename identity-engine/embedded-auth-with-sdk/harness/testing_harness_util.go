@@ -18,6 +18,7 @@ package harness
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -30,6 +31,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/okta/okta-sdk-golang/v2/okta"
+
+	"github.com/okta/okta-sdk-golang/v2/okta/query"
 	"github.com/tebeka/selenium"
 )
 
@@ -200,8 +204,16 @@ func (th *TestHarness) waitForEnrollFactorForm() error {
 	return th.seesElement(`form[action="/enrollFactor"]`)
 }
 
-func (th *TestHarness) waitForEnrollEmailForm() error {
-	return th.seesElement(`form[action="/enrollEmail"]`)
+func (th *TestHarness) waitForEmailCodeForm() error {
+	err := th.seesElement(`form[action="/enrollEmail"]`)
+	if err == nil {
+		return nil
+	}
+	err = th.seesElement(`form[action="/login/factors/email"]`)
+	if err == nil {
+		return nil
+	}
+	return th.seesElement(`form[action="/passwordRecovery/code"]`)
 }
 
 func (th *TestHarness) seesClaimsTableItemAndValueFromCurrentProfile(key string) error {
@@ -266,9 +278,9 @@ func (th *TestHarness) fillsInFormValue(selector, value string, waitForForm wait
 }
 
 func (th *TestHarness) clicksFormCheckItem(selector string, waitForForm waitFor) error {
-	if err := waitForForm(); err != nil {
+	/*if err := waitForForm(); err != nil {
 		return err
-	}
+	}*/
 
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
@@ -286,16 +298,33 @@ func (th *TestHarness) clicksFormCheckItem(selector string, waitForForm waitFor)
 	return err
 }
 
+func (th *TestHarness) existingUser() error {
+	th.currentProfile = &A18NProfile{
+		EmailAddress: os.Getenv("OKTA_IDX_USER_NAME"),
+		Password:     os.Getenv("OKTA_IDX_PASSWORD"),
+	}
+	return nil
+}
+
 func (th *TestHarness) fillsInUsername() error {
-	return th.fillsInFormValue(`input[name="identifier"]`, os.Getenv("OKTA_IDX_USER_NAME"), th.waitForLoginForm)
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
+	return th.fillsInFormValue(`input[name="identifier"]`, th.currentProfile.EmailAddress, th.waitForLoginForm)
 }
 
 func (th *TestHarness) fillsInIncorrectUsername() error {
-	return th.fillsInFormValue(`input[name="identifier"]`, "TYPO"+os.Getenv("OKTA_IDX_USER_NAME"), th.waitForLoginForm)
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
+	return th.fillsInFormValue(`input[name="identifier"]`, "TYPO"+th.currentProfile.EmailAddress, th.waitForLoginForm)
 }
 
 func (th *TestHarness) fillsInPassword() error {
-	return th.fillsInFormValue(`input[name="password"]`, os.Getenv("OKTA_IDX_PASSWORD"), th.waitForLoginForm)
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
+	return th.fillsInFormValue(`input[name="password"]`, th.currentProfile.Password, th.waitForLoginForm)
 }
 
 func (th *TestHarness) fillsInIncorrectPassword() error {
@@ -372,7 +401,6 @@ func (th *TestHarness) seesNoAccountErrorMessage() error {
 }
 
 func (th *TestHarness) isLoggedOut() error {
-
 	text := fmt.Sprintf("Welcome, %s.", claimItem("name"))
 	return th.doesNotSeeElementWithText(`html body h1`, text)
 }
@@ -545,6 +573,7 @@ func (th *TestHarness) clicksButtonWithText(selector, text string) error {
 
 	return err
 }
+
 func (th *TestHarness) clicksInputWithValue(selector, text string) error {
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
@@ -631,23 +660,19 @@ func (th *TestHarness) navigatesToThePasswordRecoveryView() error {
 }
 
 func (th *TestHarness) inputsCorrectEmail() error {
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
+
 	if err := th.waitForPasswordRecoveryForm(); err != nil {
 		return err
 	}
 
-	err := th.entersText(`input[name="identifier"]`, os.Getenv("OKTA_IDX_USER_NAME_RESET"))
-	if err != nil {
-		return err
-	}
-	return nil
+	return th.entersText(`input[name="identifier"]`, th.currentProfile.EmailAddress)
 }
 
 func (th *TestHarness) submitsForm(selector, text string) error {
-	if err := th.clicksButtonWithText(selector, text); err != nil {
-		return err
-	}
-
-	return nil
+	return th.clicksButtonWithText(selector, text)
 }
 
 func (th *TestHarness) submitsLoginForm() error {
@@ -675,18 +700,22 @@ func (th *TestHarness) seesPageToInputTheCode() error {
 }
 
 func (th *TestHarness) fillsInTheCorrectCode() error {
-	profileURL, err := th.profileURL()
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
+	code, err := th.verificationCode(th.currentProfile.URL)
 	if err != nil {
-		return err
+		return fmt.Errorf("faild to find latest verification code for user %s: %v", th.currentProfile.EmailAddress, err)
 	}
-	code, err := th.verificationCode(profileURL)
-	if err != nil {
-		return fmt.Errorf("faild to find latest verification code for user %s: %v", os.Getenv("OKTA_IDX_USER_NAME_RESET"), err)
-	}
-	if err = th.entersText(`input[name="code"]`, code); err != nil {
-		return err
-	}
-	return nil
+	return th.entersText(`input[name="code"]`, code)
+}
+
+func (th *TestHarness) fillsInTheIncorrectCode() error {
+	return th.entersText(`input[name="code"]`, randomString())
+}
+
+func (th *TestHarness) factorList() error {
+	return th.seesElement(`form[action="/login/factors/proceed"]`)
 }
 
 func (th *TestHarness) seesPageToSetNewPassword() error {
@@ -698,61 +727,59 @@ func (th *TestHarness) fillsPassword() error {
 	if err := th.entersText(`input[name="newPassword"]`, p); err != nil {
 		return err
 	}
-	if err := th.entersText(`input[name="confirmPassword"]`, p); err != nil {
-		return err
-	}
-	return nil
+	return th.entersText(`input[name="confirmPassword"]`, p)
 }
 
 func (th *TestHarness) inputsIncorrectEmail() error {
-	randomString()
-	err := th.entersText(`input[name="identifier"]`, strings.ReplaceAll(os.Getenv("OKTA_IDX_USER_NAME_RESET"), "@", "+1@"))
-	if err != nil {
-		return err
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
 	}
-	return nil
+	return th.entersText(`input[name="identifier"]`, strings.ReplaceAll(th.currentProfile.EmailAddress, "@", "+1@"))
 }
 
-func (th *TestHarness) noAccountError(errorAcc string) error {
-	errorAcc += " " + strings.ReplaceAll(os.Getenv("OKTA_IDX_USER_NAME_RESET"), "@", "+1@") + "."
-	err := th.seesElementWithText(ERROR_DIV, errorAcc)
-	if err != nil {
-		return err
+func (th *TestHarness) seesErrorMessage(errorAcc string) error {
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
 	}
-	return nil
+	if strings.Contains(errorAcc, "is no account") {
+		errorAcc += " " + strings.ReplaceAll(th.currentProfile.EmailAddress, "@", "+1@") + "."
+	}
+	return th.seesElementWithText(ERROR_DIV, errorAcc)
 }
 
 func (th *TestHarness) destroyCurrentProfile() error {
 	if th.currentProfile == nil {
 		return nil
 	}
-
-	err := th.deleteProfile(th.currentProfile)
+	err := th.deleteProfileFromOrg(th.currentProfile.UserID)
+	if err != nil {
+		return err
+	}
+	err = th.deleteProfile(th.currentProfile)
 	th.currentProfile = nil
-
 	return err
 }
 
 func (th *TestHarness) createCurrentProfile(name string) error {
 	profile, err := th.createProfile(name)
+	if err != nil {
+		return err
+	}
 	th.currentProfile = profile
-
 	return err
 }
 
-func (th *TestHarness) selectsEmailEnrollmentFactor() error {
+func (th *TestHarness) selectsEmail() error {
 	if err := th.clicksFormCheckItem(`input[name="push_email"]`, th.waitForEnrollFactorForm); err != nil {
 		return err
 	}
-
 	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
 }
 
-func (th *TestHarness) selectsPhoneEnrollmentFactor() error {
+func (th *TestHarness) selectsPhone() error {
 	if err := th.clicksFormCheckItem(`input[name="push_phone"]`, th.waitForEnrollFactorForm); err != nil {
 		return err
 	}
-
 	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
 }
 
@@ -761,6 +788,9 @@ func (th *TestHarness) clicksSkip() error {
 }
 
 func (th *TestHarness) fillsInTheEnrollmentCode() error {
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
 	code, err := th.verificationCode(th.currentProfile.URL)
 	if err != nil {
 		return fmt.Errorf("faild to find latest verification code for user %s: %v", th.currentProfile.ProfileID, err)
@@ -832,7 +862,10 @@ func (th *TestHarness) latestVerificationCode(profileURL string) (string, error)
 }
 
 func (th *TestHarness) deleteProfile(profile *A18NProfile) error {
-	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/v1/profile/%s", a18nApiURL(), profile.ProfileID), nil)
+	if profile.URL == "" {
+		return nil
+	}
+	req, err := http.NewRequest(http.MethodDelete, profile.URL, nil)
 	if err != nil {
 		return err
 	}
@@ -842,7 +875,25 @@ func (th *TestHarness) deleteProfile(profile *A18NProfile) error {
 		return err
 	}
 	defer resp.Body.Close()
+	return nil
+}
 
+func (th *TestHarness) deleteProfileFromOrg(userID string) error {
+	if userID == "" {
+		return nil
+	}
+	// deactivate
+	resp, err := th.oktaClient.User.DeactivateOrDeleteUser(context.Background(), userID, nil)
+	// suppress Not Found error
+	if err != nil && resp != nil && resp.StatusCode != http.StatusNotFound {
+		return err
+	}
+	// delete
+	_, err = th.oktaClient.User.DeactivateOrDeleteUser(context.Background(), userID, nil)
+	// suppress Not Found error
+	if err != nil && resp != nil && resp.StatusCode != http.StatusNotFound {
+		return err
+	}
 	return nil
 }
 
@@ -901,30 +952,52 @@ func (th *TestHarness) profiles() (*A18NProfiles, error) {
 	return &profiles, nil
 }
 
-func (th *TestHarness) profileURL() (string, error) {
-	profiles, err := th.profiles()
+func (th *TestHarness) addUser(condition string) error {
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
+	profile := okta.UserProfile{}
+	profile["firstName"] = th.currentProfile.GivenName
+	profile["lastName"] = th.currentProfile.FamilyName
+	profile["login"] = th.currentProfile.EmailAddress
+	profile["email"] = th.currentProfile.EmailAddress
+	if condition == "with" {
+		profile["mobilePhone"] = th.currentProfile.PhoneNumber
+	}
+	b := okta.CreateUserRequest{
+		Credentials: &okta.UserCredentials{
+			Password: &okta.PasswordCredential{
+				Value: th.currentProfile.Password,
+			},
+		},
+		Profile: &profile,
+	}
+	u, _, err := th.oktaClient.User.CreateUser(context.Background(), b, nil)
 	if err != nil {
-		return "", err
+		return err
 	}
-	userName := os.Getenv("OKTA_IDX_USER_NAME_RESET")
-	for _, v := range profiles.Profiles {
-		if v.EmailAddress == userName {
-			return v.URL, nil
-		}
-	}
-	return "", fmt.Errorf("profile with %s doesn't exist if REST API for receiving MFA verification codes", userName)
+	th.currentProfile.UserID = u.Id
+	return nil
 }
 
-func (th *TestHarness) testProfile() (*A18NProfile, error) {
-	profiles, err := th.profiles()
+func (th *TestHarness) addUserToGroup(groupName string) error {
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
+	// user is auto assigned to this group
+	if groupName == "Everyone" {
+		return nil
+	}
+	groups, _, err := th.oktaClient.Group.ListGroups(context.Background(), &query.Params{Q: groupName})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	displayName := "golang-idx-sdk"
-	for _, profile := range profiles.Profiles {
-		if profile.DisplayName == displayName {
-			return &profile, nil
+	for _, g := range groups {
+		if g.Profile.Name != groupName {
+			continue
 		}
+		_, err = th.oktaClient.Group.AddUserToGroup(context.Background(), g.Id, th.currentProfile.UserID)
+		return err
 	}
-	return nil, fmt.Errorf("profile with %s doesn't exist if REST API for receiving MFA verification codes", displayName)
+	return fmt.Errorf("group %s doesn't exist in the org", groupName)
 }
