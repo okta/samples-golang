@@ -1,8 +1,11 @@
 Feature: 1.1 Basic Login with Password Factor
 
+  Background:
+    Given there is an existing user
+
   #Background:
   #  Given a SPA, WEB APP or MOBILE Sign On Policy that defines Password as required
-  #  And User Enumeration Prevention is set to ENABLED in Security > General 
+  #  And User Enumeration Prevention is set to ENABLED in Security > General
   #  And the list of Authenticators contains Email and Password
   #  And a User named "Mary" exists, and this user has already setup email and password factors
 

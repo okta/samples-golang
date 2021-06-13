@@ -1,5 +1,9 @@
 Feature: 3.1 Direct Auth Password Recovery
 
+  Background:
+    Given there is a new sign up user named Mary Acme
+    And user is added to the org without phone number
+
   Scenario: 3.1.1 Mary resets her password
     Given Mary navigates to the Password Recovery View
     When she inputs correct Email

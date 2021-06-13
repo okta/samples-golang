@@ -1,5 +1,8 @@
 Feature: 0.1 Root page for Direct Auth Demo Application
 
+  Background:
+    Given there is an existing user
+
   @1.1.1
   Scenario: 0.1.1 Mary visits the Root View WITHOUT an authentcation session (no tokens)
     Given Mary navigates to the Root View
