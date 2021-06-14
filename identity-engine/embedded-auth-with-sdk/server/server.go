@@ -233,6 +233,10 @@ func (s *Server) enrollFactor(w http.ResponseWriter, r *http.Request) {
 	} else {
 		s.ViewData["FactorEmail"] = false
 	}
+	if errors, ok := s.cache.Get("Errors"); ok {
+		s.ViewData["Errors"] = errors
+		s.cache.Delete("Errors")
+	}
 	s.render("enroll.gohtml", w, r)
 }
 
@@ -439,6 +443,7 @@ func (s *Server) handleEnrollPhoneMethod(w http.ResponseWriter, r *http.Request)
 	if !ok || !invCode.(bool) {
 		enrollResponse, err = enrollResponse.VerifyPhone(r.Context(), pm, pn.(string))
 		if err != nil {
+			s.cache.Set("Errors", err.Error(), time.Minute*5)
 			session.Values["Errors"] = err.Error()
 			session.Save(r, w)
 			http.Redirect(w, r, "/enrollFactor", http.StatusFound)
