@@ -32,7 +32,6 @@ import (
 	"time"
 
 	"github.com/okta/okta-sdk-golang/v2/okta"
-
 	"github.com/okta/okta-sdk-golang/v2/okta/query"
 	"github.com/tebeka/selenium"
 )
@@ -212,6 +211,14 @@ func (th *TestHarness) waitForEmailCodeForm() error {
 	return th.seesElement(`form[action="/passwordRecovery/code"]`)
 }
 
+func (th *TestHarness) waitForEnrollPhoneForm() error {
+	return th.seesElement(`form[action="/enrollPhone/code"]`)
+}
+
+func (th *TestHarness) waitForEnrollPhoneMethodForm() error {
+	return th.seesElement(`form[action="/enrollPhone/method"]`)
+}
+
 func (th *TestHarness) seesClaimsTableItemAndValueFromCurrentProfile(key string) error {
 	keyID := fmt.Sprintf("%s-value", key)
 	var value string
@@ -347,6 +354,12 @@ func (th *TestHarness) fillsInSignUpEmail() error {
 	}
 	return th.fillsInFormValue(`input[name="email"]`, th.currentProfile.EmailAddress, th.waitForRegistrationForm)
 }
+func (th *TestHarness) fillsInInvalidSignUpEmail() error {
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
+	return th.fillsInFormValue(`input[name="email"]`, "invalid-email-address-dot-com", th.waitForRegistrationForm)
+}
 
 func (th *TestHarness) fillsInSignUpPassword() error {
 	if th.currentProfile == nil {
@@ -379,7 +392,7 @@ func (th *TestHarness) matchErrorMessage(partialErrStr string) error {
 		}
 
 		if matched, _ := regexp.MatchString(partialErrStr, text); !matched {
-			return false, fmt.Errorf("expected to find error message with %q message", partialErrStr)
+			return false, fmt.Errorf("expected error message %q to match %q", text, partialErrStr)
 		}
 
 		return true, nil
@@ -394,6 +407,10 @@ func (th *TestHarness) seesAuthFailedErrorMessage() error {
 
 func (th *TestHarness) seesNoAccountErrorMessage() error {
 	return th.matchErrorMessage("There is no account with the Username")
+}
+
+func (th *TestHarness) seesErrorMessage(message string) error {
+	return th.matchErrorMessage(message)
 }
 
 func (th *TestHarness) isLoggedOut() error {
@@ -694,7 +711,7 @@ func (th *TestHarness) fillsInTheCorrectCode() error {
 	if th.currentProfile == nil {
 		return errors.New("test harness doesn't have a current profile")
 	}
-	code, err := th.verificationCode(th.currentProfile.URL)
+	code, err := th.verificationCode(profileURL, EMAIL_CODE_TYPE)
 	if err != nil {
 		return fmt.Errorf("faild to find latest verification code for user %s: %v", th.currentProfile.EmailAddress, err)
 	}
@@ -792,16 +809,64 @@ func (th *TestHarness) fillsInTheEnrollmentCode() error {
 	return th.clicksButtonWithText(`button[type="submit"]`, "Submit")
 }
 
-func (th *TestHarness) verificationCode(profileURL string) (string, error) {
+func (th *TestHarness) fillsInTheEnrollmentPhone() error {
+	if err := th.entersText(`input[name="phoneNumber"]`, th.currentProfile.PhoneNumber); err != nil {
+		return err
+	}
+	return th.clicksButtonWithText(`button[type="submit"]`, "Submit")
+}
+
+func (th *TestHarness) fillsInInvalidEnrollmentPhone() error {
+	if err := th.entersText(`input[name="phoneNumber"]`, "not-a-phone-number"); err != nil {
+		return err
+	}
+	return th.clicksButtonWithText(`button[type="submit"]`, "Submit")
+}
+
+func (th *TestHarness) fillsInReceiveSMSCode() error {
+	if err := th.clicksFormCheckItem(`input[name="sms"]`, th.waitForEnrollPhoneMethodForm); err != nil {
+		return err
+	}
+
+	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
+}
+
+func (th *TestHarness) fillsInTheEnrollmentCodeSMS() error {
+	code, err := th.verificationCode(th.currentProfile.URL, SMS_CODE_TYPE)
+	if err != nil {
+		return fmt.Errorf("faild to find latest verification code for user %s: %v", th.currentProfile.ProfileID, err)
+	}
+	if err = th.entersText(`input[name="code"]`, code); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (th *TestHarness) debugSleep(amount string) error {
+	// And sleep 60s
+	d, err := time.ParseDuration(amount)
+	if err != nil {
+		return err
+	}
+	time.Sleep(d)
+	return nil
+}
+
+func (th *TestHarness) clicksVerifySMSCode() error {
+	return th.clicksButtonWithText(`button[type="submit"]`, "Submit")
+}
+
+func (th *TestHarness) verificationCode(profileURL, codeType string) (string, error) {
 	checker := time.Tick(time.Second * 5)
 	timeout := time.After(time.Minute)
 loop:
 	for {
 		select {
 		case <-timeout:
-			return "", fmt.Errorf("%s didn't receive email verification code (one minute timeout)", profileURL)
+			return "", fmt.Errorf("%s didn't receive %s verification code (one minute timeout)", profileURL, codeType)
 		case <-checker:
-			code, err := th.latestVerificationCode(profileURL)
+			code, err := th.latestVerificationCode(profileURL, codeType)
 			if err != nil {
 				break loop
 			}
@@ -810,11 +875,13 @@ loop:
 			}
 		}
 	}
-	return "", fmt.Errorf("%s didn't receive email verification code", profileURL)
+	return "", fmt.Errorf("%s didn't receive %s verification code", profileURL, codeType)
 }
 
-func (th *TestHarness) latestVerificationCode(profileURL string) (string, error) {
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/email/latest", profileURL), nil)
+func (th *TestHarness) latestVerificationCode(profileURL, codeType string) (string, error) {
+	// codeType: email, sms, voice
+	// e.g. api.a18n.help/v1/profile/nAfBjtIFF3/sms/latest
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/%s/latest", profileURL, codeType), nil)
 	if err != nil {
 		return "", err
 	}
@@ -828,23 +895,15 @@ func (th *TestHarness) latestVerificationCode(profileURL string) (string, error)
 	if err != nil {
 		return "", err
 	}
-	var latestEmail struct {
-		MessageID   string    `json:"messageId"`
-		ProfileID   string    `json:"profileId"`
-		ToAddress   string    `json:"toAddress"`
-		FromAddress string    `json:"fromAddress"`
-		CreatedAt   time.Time `json:"createdAt"`
-		Subject     string    `json:"subject"`
-		URL         string    `json:"url"`
-		Content     string    `json:"content"`
-	}
-	err = json.Unmarshal(body, &latestEmail)
+
+	var content A18NContent
+	err = json.Unmarshal(body, &content)
 	if err != nil {
 		return "", err
 	}
-	if time.Now().UTC().Sub(latestEmail.CreatedAt.UTC()) < time.Second*30 {
+	if time.Now().UTC().Sub(content.CreatedAt.UTC()) < time.Second*30 {
 		verificationCodeRegexp := regexp.MustCompile(`[:\s][0-9]{6}`)
-		code := verificationCodeRegexp.FindString(latestEmail.Content)
+		code := verificationCodeRegexp.FindString(content.Content)
 		if code != "" {
 			return strings.TrimSpace(code), nil
 		}
