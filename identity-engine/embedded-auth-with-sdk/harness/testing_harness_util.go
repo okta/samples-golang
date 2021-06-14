@@ -385,16 +385,16 @@ func (th *TestHarness) matchErrorMessage(partialErrStr string) error {
 		if err != nil {
 			return false, nil
 		}
-
 		text, err := elem.Text()
 		if err != nil {
 			return false, nil
 		}
-
+		if partialErrStr == text {
+			return true, nil
+		}
 		if matched, _ := regexp.MatchString(partialErrStr, text); !matched {
 			return false, fmt.Errorf("expected error message %q to match %q", text, partialErrStr)
 		}
-
 		return true, nil
 	}, defaultTimeout(), defaultInterval())
 
@@ -410,6 +410,12 @@ func (th *TestHarness) seesNoAccountErrorMessage() error {
 }
 
 func (th *TestHarness) seesErrorMessage(message string) error {
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
+	if strings.Contains(message, "is no account") {
+		message += " " + strings.ReplaceAll(th.currentProfile.EmailAddress, "@", "+1@") + "."
+	}
 	return th.matchErrorMessage(message)
 }
 
@@ -711,7 +717,7 @@ func (th *TestHarness) fillsInTheCorrectCode() error {
 	if th.currentProfile == nil {
 		return errors.New("test harness doesn't have a current profile")
 	}
-	code, err := th.verificationCode(profileURL, EMAIL_CODE_TYPE)
+	code, err := th.verificationCode(th.currentProfile.URL, EMAIL_CODE_TYPE)
 	if err != nil {
 		return fmt.Errorf("faild to find latest verification code for user %s: %v", th.currentProfile.EmailAddress, err)
 	}
@@ -743,16 +749,6 @@ func (th *TestHarness) inputsIncorrectEmail() error {
 		return errors.New("test harness doesn't have a current profile")
 	}
 	return th.entersText(`input[name="identifier"]`, strings.ReplaceAll(th.currentProfile.EmailAddress, "@", "+1@"))
-}
-
-func (th *TestHarness) seesErrorMessage(errorAcc string) error {
-	if th.currentProfile == nil {
-		return errors.New("test harness doesn't have a current profile")
-	}
-	if strings.Contains(errorAcc, "is no account") {
-		errorAcc += " " + strings.ReplaceAll(th.currentProfile.EmailAddress, "@", "+1@") + "."
-	}
-	return th.seesElementWithText(ERROR_DIV, errorAcc)
 }
 
 func (th *TestHarness) destroyCurrentProfile() error {
@@ -799,7 +795,7 @@ func (th *TestHarness) fillsInTheEnrollmentCode() error {
 	if th.currentProfile == nil {
 		return errors.New("test harness doesn't have a current profile")
 	}
-	code, err := th.verificationCode(th.currentProfile.URL)
+	code, err := th.verificationCode(th.currentProfile.URL, EMAIL_CODE_TYPE)
 	if err != nil {
 		return fmt.Errorf("faild to find latest verification code for user %s: %v", th.currentProfile.ProfileID, err)
 	}
@@ -929,6 +925,31 @@ func (th *TestHarness) deleteProfile(profile *A18NProfile) error {
 }
 
 func (th *TestHarness) deleteProfileFromOrg(userID string) error {
+	users, _, err := th.oktaClient.User.ListUsers(context.Background(), &query.Params{
+		Q:     "Mary",
+		Limit: 100,
+	})
+	if err != nil {
+		return err
+	}
+	for _, u := range users {
+		e := *u.Profile
+		if !strings.HasSuffix(e["email"].(string), "a18n.help") {
+			continue
+		}
+		// deactivate
+		resp, err := th.oktaClient.User.DeactivateOrDeleteUser(context.Background(), u.Id, nil)
+		// suppress Not Found error
+		if err != nil && resp != nil && resp.StatusCode != http.StatusNotFound {
+			return err
+		}
+		// delete
+		_, err = th.oktaClient.User.DeactivateOrDeleteUser(context.Background(), u.Id, nil)
+		// suppress Not Found error
+		if err != nil && resp != nil && resp.StatusCode != http.StatusNotFound {
+			return err
+		}
+	}
 	if userID == "" {
 		return nil
 	}

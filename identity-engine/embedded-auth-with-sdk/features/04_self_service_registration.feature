@@ -2,7 +2,7 @@
 Feature: 4.1 Self Service Registration with Email Activation and optional SMS
 
   Background:
-  Given there is a new sign up user named Mary Acme
+    Given there is a new sign up user named Mary Acme
   # Given a Profile Enrollment policy defined assigning new users to the Everyone Group and by collecting "First Name", "Last Name", and "Email", is allowed and assigned to a SPA, WEB APP or MOBILE application
   # And "Required before access is granted" is selected for Email Verification under Profile Enrollment in Security > Profile Enrollment
   # And configured Authenticators are Password (required), Email (required), and SMS (optional)
