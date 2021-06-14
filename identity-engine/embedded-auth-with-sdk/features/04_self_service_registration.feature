@@ -63,3 +63,13 @@ Feature: 4.1 Self Service Registration with Email Activation and optional SMS
     And she sees a table with her profile info
     And the cell for the value of "email" is shown and contains her email
     And the cell for the value of "name" is shown and contains her first name and last name
+
+  @4.1.3
+  Scenario: 4.1.3 Mary signs up with an invalid Email
+	  Given Mary navigates to the Self Service Registration View
+	  When she fills out her First Name
+	  And she fills out her Last Name
+	  And she fills out her Email with an invalid email format
+	  And she submits the registration form
+	  Then she sees an error message "'Email' must be in the form of an email address,Provided value for property 'Email' does not match required pattern"
+	  And she sees an error message "Provided value for property 'Email' does not match required pattern"
