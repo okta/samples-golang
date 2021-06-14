@@ -359,6 +359,12 @@ func (th *TestHarness) fillsInSignUpEmail() error {
 	}
 	return th.fillsInFormValue(`input[name="email"]`, th.currentProfile.EmailAddress, th.waitForRegistrationForm)
 }
+func (th *TestHarness) fillsInInvalidSignUpEmail() error {
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
+	return th.fillsInFormValue(`input[name="email"]`, "invalid-email-address-dot-com", th.waitForRegistrationForm)
+}
 
 func (th *TestHarness) fillsInSignUpPassword() error {
 	if th.currentProfile == nil {
@@ -391,7 +397,7 @@ func (th *TestHarness) matchErrorMessage(partialErrStr string) error {
 		}
 
 		if matched, _ := regexp.MatchString(partialErrStr, text); !matched {
-			return false, fmt.Errorf("expected to find error message with %q message", partialErrStr)
+			return false, fmt.Errorf("expected error message %q to match %q", text, partialErrStr)
 		}
 
 		return true, nil
@@ -406,6 +412,10 @@ func (th *TestHarness) seesAuthFailedErrorMessage() error {
 
 func (th *TestHarness) seesNoAccountErrorMessage() error {
 	return th.matchErrorMessage("There is no account with the Username")
+}
+
+func (th *TestHarness) seesErrorMessage(message string) error {
+	return th.matchErrorMessage(message)
 }
 
 func (th *TestHarness) isLoggedOut() error {

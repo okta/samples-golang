@@ -1,3 +1,4 @@
+@4
 Feature: 4.1 Self Service Registration with Email Activation and optional SMS
 
   Background:
@@ -72,4 +73,3 @@ Feature: 4.1 Self Service Registration with Email Activation and optional SMS
 	  And she fills out her Email with an invalid email format
 	  And she submits the registration form
 	  Then she sees an error message "'Email' must be in the form of an email address,Provided value for property 'Email' does not match required pattern"
-	  And she sees an error message "Provided value for property 'Email' does not match required pattern"

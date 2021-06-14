@@ -1,3 +1,4 @@
+@1
 Feature: 1.1 Basic Login with Password Factor
 
   Background:

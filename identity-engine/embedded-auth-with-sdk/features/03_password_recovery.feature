@@ -1,3 +1,4 @@
+@3
 Feature: 3.1 Direct Auth Password Recovery
 
   Background:
