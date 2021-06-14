@@ -218,6 +218,7 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`(he|she) sees a table with (her|his) profile info`, th.noop)
 	ctx.Step(`the cell for the value of "([^"]*)" is shown`, th.seesClaimsTableItemAndValueFromCurrentProfile)
 	ctx.Step(`(he|she) inputs a valid phone number`, th.fillsInTheEnrollmentPhone)
+	ctx.Step(`(he|she) inputs an invalid phone number`, th.fillsInInvalidEnrollmentPhone)
 	ctx.Step(`(he|she) selects "Receive a Code"`, th.fillsInReceiveSMSCode)
 	ctx.Step(`the screen changes to receive an input for a code`, th.waitForEnrollPhoneForm)
 	ctx.Step(`(he|she) inputs the correct code from (her|his) SMS`, th.fillsInTheEnrollmentCodeSMS)

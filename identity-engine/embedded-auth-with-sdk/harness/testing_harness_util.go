@@ -788,6 +788,13 @@ func (th *TestHarness) fillsInTheEnrollmentPhone() error {
 	return th.clicksButtonWithText(`button[type="submit"]`, "Submit")
 }
 
+func (th *TestHarness) fillsInInvalidEnrollmentPhone() error {
+	if err := th.entersText(`input[name="phoneNumber"]`, "not-a-phone-number"); err != nil {
+		return err
+	}
+	return th.clicksButtonWithText(`button[type="submit"]`, "Submit")
+}
+
 func (th *TestHarness) fillsInReceiveSMSCode() error {
 	if err := th.clicksFormCheckItem(`input[name="sms"]`, th.waitForEnrollPhoneMethodForm); err != nil {
 		return err

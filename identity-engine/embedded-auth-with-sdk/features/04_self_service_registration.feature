@@ -73,3 +73,23 @@ Feature: 4.1 Self Service Registration with Email Activation and optional SMS
 	  And she fills out her Email with an invalid email format
 	  And she submits the registration form
 	  Then she sees an error message "'Email' must be in the form of an email address,Provided value for property 'Email' does not match required pattern"
+
+#  @4.1.4
+#  Scenario: 4.1.4 Mary signs up for an account with Password, sets up required Email factor, AND sets up optional SMS with an invalid phone number
+#    Given Mary navigates to the Self Service Registration View
+#    When she fills out her First Name
+#    And she fills out her Last Name
+#    And she fills out her Email
+#    And she submits the registration form
+#    When she fills out her Password
+#    And she confirms her Password
+#    And she submits the set new password form
+#    When she selects Email
+#    Then she sees a page to input a code
+#    When she inputs the correct code from her email
+#    Then she sees the list of optional factors (SMS)
+#    When she selects Phone from the list
+#    And she inputs an invalid phone number
+#    And she selects "Receive a Code"
+# TODO there seems to be an error but the sample app is not surfacing it
+#    Then she sees an error message "Unable to initiate factor enrollment: Invalid Phone Number."
