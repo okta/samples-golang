@@ -1,3 +1,4 @@
+@6.1
 Feature: 6.1 Multi-Factor Authentication with Password and Email
 
   Background:
@@ -5,6 +6,7 @@ Feature: 6.1 Multi-Factor Authentication with Password and Email
     And user is added to the org without phone number
     And user is assigned to the group MFA Required
 
+  @6.1.2
   Scenario: 6.1.2 2FA Login with Email
     Given Mary navigates to the Basic Login View
     When she fills in her correct username
@@ -20,6 +22,7 @@ Feature: 6.1 Multi-Factor Authentication with Password and Email
     And the cell for the value of "email" is shown and contains her email
     And the cell for the value of "name" is shown and contains her first name and last name
 
+  @6.1.3
   Scenario: 6.1.3 Mary enters a wrong verification code
     Given Mary navigates to the Basic Login View
     When she fills in her correct username

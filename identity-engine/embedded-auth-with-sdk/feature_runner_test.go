@@ -17,7 +17,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
@@ -40,7 +39,6 @@ func init() {
 func TestMain(m *testing.M) {
 	flag.Parse()
 	godogOptions.Paths = flag.Args()
-	fmt.Println(godogOptions)
 
 	th := harness.NewTestHarness()
 

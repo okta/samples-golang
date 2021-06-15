@@ -26,11 +26,13 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cucumber/godog"
 	"github.com/cucumber/messages-go/v10"
 	"github.com/okta/okta-sdk-golang/v2/okta"
+	"github.com/okta/okta-sdk-golang/v2/okta/query"
 	"github.com/tebeka/selenium"
 
 	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/config"
@@ -123,6 +125,24 @@ func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 		server := server.NewServer(cfg)
 		th.server = server
 		th.oktaClient = client
+
+		users, _, _ := th.oktaClient.User.ListUsers(context.Background(), &query.Params{
+			Q:     "Mary",
+			Limit: 100,
+		})
+		for _, u := range users {
+			e := *u.Profile
+			if !strings.HasSuffix(e["email"].(string), "a18n.help") {
+				continue
+			}
+			// deactivate
+			th.oktaClient.User.DeactivateOrDeleteUser(context.Background(), u.Id, nil)
+			time.Sleep(time.Second)
+			// delete
+			th.oktaClient.User.DeactivateOrDeleteUser(context.Background(), u.Id, nil)
+			// suppress Not Found error
+		}
+
 		server.Run()
 	})
 
@@ -261,7 +281,12 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`inputs incorrect Email`, th.inputsIncorrectEmail)
 	ctx.Step(`^she sees a message "([^"]*)"$`, th.seesErrorMessage)
 
-	// 6.x.x
 	ctx.Step(`fills in the incorrect code`, th.fillsInTheIncorrectCode)
 	ctx.Step(`sees a list of factors`, th.factorList)
+
+	ctx.Step(`sees form with method and phone number$`, th.seesPhoneWithMethod)
+	ctx.Step(`sees form with method$`, th.seesMethod)
+	ctx.Step(`inputs a method and valid phone number$`, th.submitsPhoneWithMethod)
+	ctx.Step(`inputs a method and invalid phone number$`, th.submitsInvalidPhoneWithMethod)
+	ctx.Step(`inputs a method$`, th.submitsMethod)
 }

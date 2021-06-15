@@ -204,19 +204,11 @@ func (th *TestHarness) waitForEnrollFactorForm() error {
 }
 
 func (th *TestHarness) waitForEmailCodeForm() error {
-	err := th.seesElement(`form[action="/enrollEmail"]`)
-	if err == nil {
-		return nil
-	}
-	err = th.seesElement(`form[action="/login/factors/email"]`)
-	if err == nil {
-		return nil
-	}
-	return th.seesElement(`form[action="/passwordRecovery/code"]`)
+	return th.seesElement(`input[id="code"]`)
 }
 
 func (th *TestHarness) waitForEnrollPhoneForm() error {
-	return th.seesElement(`form[action="/enrollPhone/code"]`)
+	return th.seesElement(`input[id="code"]`)
 }
 
 func (th *TestHarness) waitForEnrollPhoneMethodForm() error {
@@ -358,6 +350,7 @@ func (th *TestHarness) fillsInSignUpEmail() error {
 	}
 	return th.fillsInFormValue(`input[name="email"]`, th.currentProfile.EmailAddress, th.waitForRegistrationForm)
 }
+
 func (th *TestHarness) fillsInInvalidSignUpEmail() error {
 	if th.currentProfile == nil {
 		return errors.New("test harness doesn't have a current profile")
@@ -848,6 +841,45 @@ func (th *TestHarness) fillsInTheEnrollmentCodeSMS() error {
 	return nil
 }
 
+func (th *TestHarness) seesPhoneWithMethod() error {
+	err := th.seesElement(`input[id="phoneNumber"]`)
+	if err == nil {
+		return nil
+	}
+	return th.seesElement(`input[id="sms"]`)
+}
+
+func (th *TestHarness) seesMethod() error {
+	return th.seesElement(`input[id="sms"]`)
+}
+
+func (th *TestHarness) submitsPhoneWithMethod() error {
+	if err := th.entersText(`input[name="phoneNumber"]`, th.currentProfile.PhoneNumber); err != nil {
+		return err
+	}
+	if err := th.clicksFormCheckItem(`input[id="sms"]`, th.waitForEnrollPhoneMethodForm); err != nil {
+		return err
+	}
+	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
+}
+
+func (th *TestHarness) submitsInvalidPhoneWithMethod() error {
+	if err := th.entersText(`input[name="phoneNumber"]`, "[]"); err != nil {
+		return err
+	}
+	if err := th.clicksFormCheckItem(`input[id="sms"]`, nil); err != nil {
+		return err
+	}
+	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
+}
+
+func (th *TestHarness) submitsMethod() error {
+	if err := th.clicksFormCheckItem(`input[id="sms"]`, th.waitForEnrollPhoneMethodForm); err != nil {
+		return err
+	}
+	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
+}
+
 func (th *TestHarness) debugSleep(amount string) error {
 	// And sleep 60s
 	d, err := time.ParseDuration(amount)
@@ -906,7 +938,7 @@ func (th *TestHarness) latestVerificationCode(profileURL, codeType string) (stri
 	if err != nil {
 		return "", err
 	}
-	if time.Now().UTC().Sub(content.CreatedAt.UTC()) < time.Second*30 {
+	if time.Now().UTC().Sub(content.CreatedAt.UTC()) < time.Second*60 {
 		verificationCodeRegexp := regexp.MustCompile(`[:\s][0-9]{6}`)
 		code := verificationCodeRegexp.FindString(content.Content)
 		if code != "" {
@@ -968,6 +1000,7 @@ func (th *TestHarness) deleteProfileFromOrg(userID string) error {
 	if err != nil && resp != nil && resp.StatusCode != http.StatusNotFound {
 		return err
 	}
+	time.Sleep(time.Second) // it's silly to put sleeps in the code, but it does not affect the tests themselves
 	// delete
 	_, err = th.oktaClient.User.DeactivateOrDeleteUser(context.Background(), userID, nil)
 	// suppress Not Found error
@@ -1043,6 +1076,7 @@ func (th *TestHarness) addUser(condition string) error {
 	profile["email"] = th.currentProfile.EmailAddress
 	if condition == "with" {
 		profile["mobilePhone"] = th.currentProfile.PhoneNumber
+		profile["primaryPhone"] = th.currentProfile.PhoneNumber
 	}
 	b := okta.CreateUserRequest{
 		Credentials: &okta.UserCredentials{
@@ -1056,8 +1090,49 @@ func (th *TestHarness) addUser(condition string) error {
 	if err != nil {
 		return err
 	}
+	if condition == "with" {
+		err = th.enrollSMSFactor(u.Id)
+		if err != nil {
+			return err
+		}
+	}
 	th.currentProfile.UserID = u.Id
 	return nil
+}
+
+type userFactor struct {
+	ID         string                 `json:"id"`
+	FactorType string                 `json:"factorType"`
+	Provider   string                 `json:"provider"`
+	Profile    map[string]interface{} `json:"profile"`
+}
+
+func (th *TestHarness) enrollSMSFactor(uID string) error {
+	factor := []byte(fmt.Sprintf(`{
+	  "factorType": "sms",
+	  "provider": "OKTA",
+	  "profile": {
+	    "phoneNumber": "%s"
+	  }
+	}`, th.currentProfile.PhoneNumber))
+	req, err := th.oktaClient.GetRequestExecutor().
+		WithAccept("application/json").
+		WithContentType("application/json").
+		NewRequest(http.MethodPost, fmt.Sprintf("/api/v1/users/%v/factors", uID), factor)
+	if err != nil {
+		return err
+	}
+	var uf userFactor
+	_, err = th.oktaClient.GetRequestExecutor().Do(context.Background(), req, &uf)
+	if err != nil {
+		return err
+	}
+	code, err := th.verificationCode(th.currentProfile.URL, SMS_CODE_TYPE)
+	if err != nil {
+		return fmt.Errorf("faild to find latest verification code for user %s: %v", th.currentProfile.EmailAddress, err)
+	}
+	_, _, err = th.oktaClient.UserFactor.ActivateFactor(context.Background(), uID, uf.ID, okta.ActivateFactorRequest{PassCode: code}, nil)
+	return err
 }
 
 func (th *TestHarness) addUserToGroup(groupName string) error {
