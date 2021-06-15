@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/sessions"
+
 	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/config"
 )
 

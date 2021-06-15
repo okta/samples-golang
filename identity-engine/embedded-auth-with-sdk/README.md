@@ -70,12 +70,12 @@ environment variables are utilized for the test user in the selenium tests.
 
 * `OKTA_IDX_USER_NAME` - The test user that the features will be run as (string)
 * `OKTA_IDX_PASSWORD` - The test users's password (string)
-* `OKTA_IDX_USER_NAME_RESET` - The test user for reset password flow (string)
 * `OKTA_IDX_CLAIMS` - Name/value JSON map of claims that will be checked (string)
 * `SELENIUM_URL` - The Selenium server's URL (string)
 * `DEBUG=true` - Triggers debug loglines from the godog harness to be emitted
 * `A18N_API_URL` - REST API URL for receiving MFA verification codes
 * `A18N_API_KEY` - REST API Key
+* `OKTA_CLIENT_TOKEN` - Token for Okta Public API
 
 ```
 # OKTA_IDX_ISSUER, OKTA_IDX_CLIENTID, OKTA_IDX_CLIENTSECRET,
