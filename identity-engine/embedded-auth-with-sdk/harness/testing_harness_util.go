@@ -204,7 +204,7 @@ func (th *TestHarness) waitForEmailCodeForm() error {
 }
 
 func (th *TestHarness) waitForEnrollPhoneForm() error {
-	return th.seesElement(`form[action="/enrollPhone/code"]`)
+	return th.seesElement(`input[id="code"]`)
 }
 
 func (th *TestHarness) waitForEnrollPhoneMethodForm() error {
