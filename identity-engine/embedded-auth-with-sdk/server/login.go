@@ -194,6 +194,10 @@ func (s *Server) handleLoginPhoneVerificationMethod(w http.ResponseWriter, r *ht
 func (s *Server) handleLoginPhoneVerification(w http.ResponseWriter, r *http.Request) {
 	clr, _ := s.cache.Get("loginResponse")
 	lr := clr.(*idx.LoginResponse)
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
 	if lr.HasStep(idx.LoginStepPhoneInitialVerification) || lr.HasStep(idx.LoginStepPhoneVerification) {
 		// get method
 		_ = r.FormValue("voice")
@@ -207,7 +211,9 @@ func (s *Server) handleLoginPhoneVerification(w http.ResponseWriter, r *http.Req
 				lr, err = lr.VerifyPhone(r.Context(), idx.PhoneMethodSMS)
 			}
 			if err != nil {
-				http.Redirect(w, r, "/login/factors", http.StatusFound)
+				session.Values["Errors"] = err.Error()
+				session.Save(r, w)
+				http.Redirect(w, r, "/login/factors/phone/method", http.StatusFound)
 				return
 			}
 			s.cache.Set("loginResponse", lr, time.Minute*5)

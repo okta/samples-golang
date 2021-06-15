@@ -865,6 +865,16 @@ func (th *TestHarness) submitsPhoneWithMethod() error {
 	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
 }
 
+func (th *TestHarness) submitsInvalidPhoneWithMethod() error {
+	if err := th.entersText(`input[name="phoneNumber"]`, "[]"); err != nil {
+		return err
+	}
+	if err := th.clicksFormCheckItem(`input[id="sms"]`, nil); err != nil {
+		return err
+	}
+	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
+}
+
 func (th *TestHarness) submitsMethod() error {
 	if err := th.clicksFormCheckItem(`input[id="sms"]`, th.waitForEnrollPhoneMethodForm); err != nil {
 		return err
