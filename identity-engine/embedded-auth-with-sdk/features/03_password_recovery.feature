@@ -1,5 +1,6 @@
 Feature: 3.1 Direct Auth Password Recovery
 
+  @3.1.1
   Scenario: 3.1.1 Mary resets her password
     Given Mary navigates to the Password Recovery View
     When she inputs correct Email
@@ -12,6 +13,7 @@ Feature: 3.1 Direct Auth Password Recovery
     And she submits new password form
     Then she is redirected back to the Root View
 
+  @3.1.2
   Scenario: 3.1.2 Mary tries to reset a password with the wrong email
     Given Mary navigates to the Password Recovery View
     When she inputs incorrect Email

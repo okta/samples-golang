@@ -159,6 +159,10 @@ func (th *TestHarness) waitForLoginForm() error {
 	return th.seesElement(`form[action="/login"]`)
 }
 
+func (th *TestHarness) waitForPasswordRecoveryForm() error {
+	return th.seesElement(`form[action="/passwordRecovery"]`)
+}
+
 func (th *TestHarness) loginToApplication() error {
 	debug("loginToApplication")
 	err := th.clickLink("Sign In")
@@ -551,6 +555,11 @@ func (th *TestHarness) navigatesToThePasswordRecoveryView() error {
 
 func (th *TestHarness) inputsCorrectEmail() error {
 	debug("inputsCorrectEmail")
+
+	if err := th.waitForPasswordRecoveryForm(); err != nil {
+		return err
+	}
+
 	err := th.entersText(`input[name="identifier"]`, os.Getenv("OKTA_IDX_USER_NAME_RESET"))
 	if err != nil {
 		return err
