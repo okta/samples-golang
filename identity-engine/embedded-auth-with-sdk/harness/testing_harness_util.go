@@ -200,19 +200,7 @@ func (th *TestHarness) waitForEnrollFactorForm() error {
 }
 
 func (th *TestHarness) waitForEmailCodeForm() error {
-	err := th.seesElement(`form[action="/enrollEmail"]`)
-	if err == nil {
-		return nil
-	}
-	err = th.seesElement(`form[action="/login/factors/email"]`)
-	if err == nil {
-		return nil
-	}
-	err = th.seesElement(`form[action="/login/factors/phone"]`)
-	if err == nil {
-		return nil
-	}
-	return th.seesElement(`form[action="/passwordRecovery/code"]`)
+	return th.seesElement(`input[id="code"]`)
 }
 
 func (th *TestHarness) waitForEnrollPhoneForm() error {
@@ -358,6 +346,7 @@ func (th *TestHarness) fillsInSignUpEmail() error {
 	}
 	return th.fillsInFormValue(`input[name="email"]`, th.currentProfile.EmailAddress, th.waitForRegistrationForm)
 }
+
 func (th *TestHarness) fillsInInvalidSignUpEmail() error {
 	if th.currentProfile == nil {
 		return errors.New("test harness doesn't have a current profile")

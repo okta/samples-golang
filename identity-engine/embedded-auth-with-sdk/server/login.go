@@ -97,6 +97,7 @@ func (s *Server) handleLoginSecondaryFactors(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *Server) handleLoginSecondaryFactorsProceed(w http.ResponseWriter, r *http.Request) {
+	delete(s.ViewData, "InvalidEmailCode")
 	if r.FormValue("push_email") != "" {
 		http.Redirect(w, r, "/login/factors/email", http.StatusFound)
 		return

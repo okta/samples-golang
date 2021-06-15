@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/okta/okta-sdk-golang/v2/okta/query"
 	"log"
 	"math/rand"
 	"net/http"
@@ -29,6 +28,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/okta/okta-sdk-golang/v2/okta/query"
 
 	"github.com/cucumber/godog"
 	"github.com/cucumber/messages-go/v10"
@@ -125,7 +126,7 @@ func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 		th.server = server
 		th.oktaClient = client
 
-		users, _, _:= th.oktaClient.User.ListUsers(context.Background(), &query.Params{
+		users, _, _ := th.oktaClient.User.ListUsers(context.Background(), &query.Params{
 			Q:     "Mary",
 			Limit: 100,
 		})
