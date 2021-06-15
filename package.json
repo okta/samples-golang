@@ -43,7 +43,7 @@
     "test:custom-login": "npm run setup-env && protractor okta-oidc-tck/e2e-tests/custom-login/conf.js",
     "test:e2e": "npm run test:okta-hosted-login && npm run test:custom-login",
     "test-old": "npm run test:e2e && npm run test:resource-server",
-    "test:idx-embedded-auth-with-sdk": "cd identity-engine/embedded-auth-with-sdk/ && go test -v",
+    "test:idx-embedded-auth-with-sdk": "cd identity-engine/embedded-auth-with-sdk/ && go test -v --godog.tags=~@no-ci",
     "test": "npm run test:idx-embedded-auth-with-sdk"
   }
 }

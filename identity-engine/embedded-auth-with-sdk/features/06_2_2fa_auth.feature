@@ -1,4 +1,4 @@
-@6.2
+@6.2 @no-ci
 Feature: 6.2 Multi-Factor Authentication with Password and SMS
 
   @6.2.1
