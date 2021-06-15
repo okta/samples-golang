@@ -246,7 +246,6 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`(he|she) inputs the correct code from (her|his) SMS`, th.fillsInTheEnrollmentCodeSMS)
 	ctx.Step(`(he|she) selects "Verify"`, th.clicksVerifySMSCode)
 
-	// 3.x.x
 	ctx.Step(`navigates to the Password Recovery View`, th.navigatesToThePasswordRecoveryView)
 	ctx.Step(`inputs correct Email`, th.inputsCorrectEmail)
 	ctx.Step(`submits the recovery form`, th.submitsTheRecoveryForm)
@@ -260,7 +259,11 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`inputs incorrect Email`, th.inputsIncorrectEmail)
 	ctx.Step(`^she sees a message "([^"]*)"$`, th.seesErrorMessage)
 
-	// 6.x.x
 	ctx.Step(`fills in the incorrect code`, th.fillsInTheIncorrectCode)
 	ctx.Step(`sees a list of factors`, th.factorList)
+
+	ctx.Step(`sees form with method and phone number$`, th.seesPhoneWithMethod)
+	ctx.Step(`sees form with method$`, th.seesMethod)
+	ctx.Step(`inputs a method and valid phone number$`, th.submitsPhoneWithMethod)
+	ctx.Step(`inputs a method$`, th.submitsMethod)
 }
