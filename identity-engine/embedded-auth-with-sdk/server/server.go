@@ -32,10 +32,11 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	"github.com/howeyc/fsnotify"
+	"github.com/patrickmn/go-cache"
 	idx "github.com/okta/okta-idx-golang"
+
 	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/config"
 	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/views"
-	"github.com/patrickmn/go-cache"
 )
 
 type Server struct {

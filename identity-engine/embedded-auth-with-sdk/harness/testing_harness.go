@@ -31,9 +31,10 @@ import (
 	"github.com/cucumber/godog"
 	"github.com/cucumber/messages-go/v10"
 	"github.com/okta/okta-sdk-golang/v2/okta"
+	"github.com/tebeka/selenium"
+
 	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/config"
 	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/server"
-	"github.com/tebeka/selenium"
 )
 
 const (
