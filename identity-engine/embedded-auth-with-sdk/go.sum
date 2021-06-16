@@ -188,6 +188,10 @@ github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLA
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
 github.com/okta/okta-idx-golang v0.0.0-20210615154025-e6cfc3574d83 h1:+YJtpuGCqyugZalfC6QABn9go08DmpldHLXczzb8EIc=
 github.com/okta/okta-idx-golang v0.0.0-20210615154025-e6cfc3574d83/go.mod h1:h+cnPj4zH6JpdNv2+llAvTKNA3UL8ySofhJ9QVT6xoc=
+github.com/okta/okta-idx-golang v0.0.0-20210616144821-6a2ac346d307 h1:/CxQtcfyHNvO5Qsy2BQb69fVCr8KsjUuLGHWS1WLL+c=
+github.com/okta/okta-idx-golang v0.0.0-20210616144821-6a2ac346d307/go.mod h1:h+cnPj4zH6JpdNv2+llAvTKNA3UL8ySofhJ9QVT6xoc=
+github.com/okta/okta-idx-golang v0.0.0-20210616214838-3b5b783f92a3 h1:kszug/4JaznYsVx91sxqd3eZCvo8BuuMAN+abL6zAz8=
+github.com/okta/okta-idx-golang v0.0.0-20210616214838-3b5b783f92a3/go.mod h1:h+cnPj4zH6JpdNv2+llAvTKNA3UL8ySofhJ9QVT6xoc=
 github.com/okta/okta-sdk-golang/v2 v2.3.1-0.20210519105407-20ace51aad26 h1:GslfCBAaOiuJ04Vm/3SFptoLZm0nzdOO6DYuWGnteK4=
 github.com/okta/okta-sdk-golang/v2 v2.3.1-0.20210519105407-20ace51aad26/go.mod h1:G4GCqqnZJCt91zMqYhDMLhg2INVbjiiFKkQ2mnia1J0=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
