@@ -18,21 +18,19 @@ package harness
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/okta/okta-sdk-golang/v2/okta"
-	"github.com/okta/okta-sdk-golang/v2/okta/query"
 	"github.com/tebeka/selenium"
 )
 
@@ -128,16 +126,19 @@ func (th *TestHarness) isPasswordResetView() error {
 	return th.isView(fmt.Sprintf("http://%s/passwordRecovery", th.server.Address()))
 }
 
-func (th *TestHarness) isView(url string) error {
+func (th *TestHarness) isView(rawURL string) error {
 	currentURL, err := th.wd.CurrentURL()
 	if err != nil {
 		return err
 	}
-
-	if url != currentURL {
-		return fmt.Errorf("isView expects %q url, finds %q url", url, currentURL)
+	u, _ := url.Parse(currentURL)
+	currentURL = u.Scheme+"://"+u.Host+u.Path
+	if strings.Contains(currentURL, "localhost") {
+		currentURL = strings.ReplaceAll(currentURL, "localhost", "127.0.0.1")
 	}
-
+	if rawURL != currentURL {
+		return fmt.Errorf("isView expects %q url, finds %q url", rawURL, currentURL)
+	}
 	return nil
 }
 
@@ -564,6 +565,19 @@ func (th *TestHarness) doesNotSeeElementWithText(selector, text string) error {
 	return err
 }
 
+func (th *TestHarness) clicksButton(selector string) error {
+	return th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
+		if err != nil {
+			return false, nil
+		}
+		if err = elem.Click(); err != nil {
+			return false, err
+		}
+		return true, nil
+	}, defaultTimeout(), defaultInterval())
+}
+
 func (th *TestHarness) clicksButtonWithText(selector, text string) error {
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
@@ -965,51 +979,6 @@ func (th *TestHarness) deleteProfile(profile *A18NProfile) error {
 	return nil
 }
 
-func (th *TestHarness) deleteProfileFromOrg(userID string) error {
-	users, _, err := th.oktaClient.User.ListUsers(context.Background(), &query.Params{
-		Q:     "Mary",
-		Limit: 100,
-	})
-	if err != nil {
-		return err
-	}
-	for _, u := range users {
-		e := *u.Profile
-		if !strings.HasSuffix(e["email"].(string), "a18n.help") {
-			continue
-		}
-		// deactivate
-		resp, err := th.oktaClient.User.DeactivateOrDeleteUser(context.Background(), u.Id, nil)
-		// suppress Not Found error
-		if err != nil && resp != nil && resp.StatusCode != http.StatusNotFound {
-			return err
-		}
-		// delete
-		_, err = th.oktaClient.User.DeactivateOrDeleteUser(context.Background(), u.Id, nil)
-		// suppress Not Found error
-		if err != nil && resp != nil && resp.StatusCode != http.StatusNotFound {
-			return err
-		}
-	}
-	if userID == "" {
-		return nil
-	}
-	// deactivate
-	resp, err := th.oktaClient.User.DeactivateOrDeleteUser(context.Background(), userID, nil)
-	// suppress Not Found error
-	if err != nil && resp != nil && resp.StatusCode != http.StatusNotFound {
-		return err
-	}
-	time.Sleep(time.Second) // it's silly to put sleeps in the code, but it does not affect the tests themselves
-	// delete
-	_, err = th.oktaClient.User.DeactivateOrDeleteUser(context.Background(), userID, nil)
-	// suppress Not Found error
-	if err != nil && resp != nil && resp.StatusCode != http.StatusNotFound {
-		return err
-	}
-	return nil
-}
-
 func (th *TestHarness) createProfile(name string) (*A18NProfile, error) {
 	data := fmt.Sprintf("{\"displayName\":%q}", name)
 	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/v1/profile", a18nApiURL()), bytes.NewBufferString(data))
@@ -1065,41 +1034,6 @@ func (th *TestHarness) profiles() (*A18NProfiles, error) {
 	return &profiles, nil
 }
 
-func (th *TestHarness) addUser(condition string) error {
-	if th.currentProfile == nil {
-		return errors.New("test harness doesn't have a current profile")
-	}
-	profile := okta.UserProfile{}
-	profile["firstName"] = th.currentProfile.GivenName
-	profile["lastName"] = th.currentProfile.FamilyName
-	profile["login"] = th.currentProfile.EmailAddress
-	profile["email"] = th.currentProfile.EmailAddress
-	if condition == "with" {
-		profile["mobilePhone"] = th.currentProfile.PhoneNumber
-		profile["primaryPhone"] = th.currentProfile.PhoneNumber
-	}
-	b := okta.CreateUserRequest{
-		Credentials: &okta.UserCredentials{
-			Password: &okta.PasswordCredential{
-				Value: th.currentProfile.Password,
-			},
-		},
-		Profile: &profile,
-	}
-	u, _, err := th.oktaClient.User.CreateUser(context.Background(), b, nil)
-	if err != nil {
-		return err
-	}
-	if condition == "with" {
-		err = th.enrollSMSFactor(u.Id)
-		if err != nil {
-			return err
-		}
-	}
-	th.currentProfile.UserID = u.Id
-	return nil
-}
-
 type userFactor struct {
 	ID         string                 `json:"id"`
 	FactorType string                 `json:"factorType"`
@@ -1107,52 +1041,38 @@ type userFactor struct {
 	Profile    map[string]interface{} `json:"profile"`
 }
 
-func (th *TestHarness) enrollSMSFactor(uID string) error {
-	factor := []byte(fmt.Sprintf(`{
-	  "factorType": "sms",
-	  "provider": "OKTA",
-	  "profile": {
-	    "phoneNumber": "%s"
-	  }
-	}`, th.currentProfile.PhoneNumber))
-	req, err := th.oktaClient.GetRequestExecutor().
-		WithAccept("application/json").
-		WithContentType("application/json").
-		NewRequest(http.MethodPost, fmt.Sprintf("/api/v1/users/%v/factors", uID), factor)
-	if err != nil {
-		return err
+func (th *TestHarness) facebookUser() error {
+	th.currentProfile = &A18NProfile{
+		EmailAddress: os.Getenv("OKTA_IDX_FACEBOOK_USER_NAME"),
+		Password:     os.Getenv("OKTA_IDX_FACEBOOK_USER_PASSWORD"),
+		GivenName:    "Golang",
+		FamilyName:   "User",
+		DisplayName:  "Golang SDK Test User",
 	}
-	var uf userFactor
-	_, err = th.oktaClient.GetRequestExecutor().Do(context.Background(), req, &uf)
-	if err != nil {
-		return err
-	}
-	code, err := th.verificationCode(th.currentProfile.URL, SMS_CODE_TYPE)
-	if err != nil {
-		return fmt.Errorf("faild to find latest verification code for user %s: %v", th.currentProfile.EmailAddress, err)
-	}
-	_, _, err = th.oktaClient.UserFactor.ActivateFactor(context.Background(), uID, uf.ID, okta.ActivateFactorRequest{PassCode: code}, nil)
-	return err
+	return nil
 }
 
-func (th *TestHarness) addUserToGroup(groupName string) error {
+func (th *TestHarness) clicksLoginWithFacebook() error {
+	return th.clicksButtonWithText(`span[class="px-4"]`, "Facebook IdP")
+}
+
+func (th *TestHarness) waitForFacebookLoginForm() error {
+	return th.seesElement(`form[id="login_form"]`)
+}
+
+func (th *TestHarness) logsIntoFacebook() error {
 	if th.currentProfile == nil {
 		return errors.New("test harness doesn't have a current profile")
 	}
-	// user is auto assigned to this group
-	if groupName == "Everyone" {
-		return nil
-	}
-	groups, _, err := th.oktaClient.Group.ListGroups(context.Background(), &query.Params{Q: groupName})
+
+	err := th.fillsInFormValue(`input[name="email"]`, th.currentProfile.EmailAddress, th.waitForFacebookLoginForm)
 	if err != nil {
 		return err
 	}
-	for _, g := range groups {
-		if g.Profile.Name != groupName {
-			continue
-		}
-		_, err = th.oktaClient.Group.AddUserToGroup(context.Background(), g.Id, th.currentProfile.UserID)
+	err = th.fillsInFormValue(`input[name="pass"]`, th.currentProfile.Password, th.waitForFacebookLoginForm)
+	if err != nil {
 		return err
 	}
-	return fmt.Errorf("group %s doesn't exist in the org", groupName)
+	err = th.clicksButton(`button[type="submit"]`)
+	return err
 }

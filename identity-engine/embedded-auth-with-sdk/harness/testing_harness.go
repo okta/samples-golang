@@ -91,6 +91,14 @@ type TestHarness struct {
 	currentProfile *A18NProfile
 	httpClient     *http.Client
 	oktaClient     *okta.Client
+	org            orgData
+}
+
+type orgData struct {
+	policyID           string
+	mfaRuleID          string
+	mfaRequiredGroupID string
+	everyoneGroupID    string
 }
 
 func NewTestHarness() *TestHarness {
@@ -122,32 +130,36 @@ func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		server := server.NewServer(cfg)
-		th.server = server
+		srv := server.NewServer(cfg)
+		th.server = srv
 		th.oktaClient = client
 
-		users, _, _ := th.oktaClient.User.ListUsers(context.Background(), &query.Params{
-			Q:     "Mary",
-			Limit: 100,
-		})
-		for _, u := range users {
-			e := *u.Profile
-			if !strings.HasSuffix(e["email"].(string), "a18n.help") {
-				continue
-			}
-			// deactivate
-			th.oktaClient.User.DeactivateOrDeleteUser(context.Background(), u.Id, nil)
-			time.Sleep(time.Second)
-			// delete
-			th.oktaClient.User.DeactivateOrDeleteUser(context.Background(), u.Id, nil)
-			// suppress Not Found error
-		}
+		th.depopulateMary()
+		th.fillInOrgInfo()
 
-		server.Run()
+		srv.Run()
 	})
 
 	ctx.AfterSuite(func() {
 	})
+}
+
+func (th *TestHarness) depopulateMary() {
+	users, _, _ := th.oktaClient.User.ListUsers(context.Background(), &query.Params{
+		Q:     "Mary",
+		Limit: 100,
+	})
+	for _, u := range users {
+		e := *u.Profile
+		if !strings.HasSuffix(e["email"].(string), "a18n.help") {
+			continue
+		}
+		// deactivate
+		th.oktaClient.User.DeactivateOrDeleteUser(context.Background(), u.Id, nil)
+		time.Sleep(time.Second)
+		// delete
+		th.oktaClient.User.DeactivateOrDeleteUser(context.Background(), u.Id, nil)
+	}
 }
 
 func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
@@ -201,6 +213,11 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 		err = th.destroyCurrentProfile()
 		if err != nil {
 			fmt.Printf("AfterScenario error destroying profile: %+v\n", err)
+		}
+
+		err = th.resetAppSignOnPolicyRule()
+		if err != nil {
+			fmt.Printf("AfterScenario error reseting Sign On Policy (next tests might fail): %+v\n", err)
 		}
 
 		// always force a logout
@@ -277,7 +294,6 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`sees a page to set new password`, th.seesPageToSetNewPassword)
 	ctx.Step(`fills a password that fits within the password policy`, th.fillsPassword)
 	ctx.Step(`she submits new password form`, th.submitsNewPassword)
-	ctx.Step(`is redirected back to the Root View`, th.isRootView)
 	ctx.Step(`inputs incorrect Email`, th.inputsIncorrectEmail)
 	ctx.Step(`^she sees a message "([^"]*)"$`, th.seesErrorMessage)
 
@@ -288,5 +304,9 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`sees form with method$`, th.seesMethod)
 	ctx.Step(`inputs a method and valid phone number$`, th.submitsPhoneWithMethod)
 	ctx.Step(`inputs a method and invalid phone number$`, th.submitsInvalidPhoneWithMethod)
-	ctx.Step(`inputs a method$`, th.submitsMethod)
+
+	ctx.Step(`user with Facebook account`, th.facebookUser)
+	ctx.Step(`she clicks the Login with Facebook button`, th.clicksLoginWithFacebook)
+	ctx.Step(`^logs into Facebook$`, th.logsIntoFacebook)
+	ctx.Step(`app Sign On Policy MFA Rule has Everyone user's group membership`, th.singOnPolicyRuleGroup)
 }

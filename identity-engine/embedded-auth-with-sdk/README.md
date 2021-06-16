@@ -76,6 +76,8 @@ environment variables are utilized for the test user in the selenium tests.
 * `A18N_API_URL` - REST API URL for receiving MFA verification codes
 * `A18N_API_KEY` - REST API Key
 * `OKTA_CLIENT_TOKEN` - Token for Okta Public API
+* `OKTA_IDX_FACEBOOK_USER_NAME` - email of Facebook registered user
+* `OKTA_IDX_FACEBOOK_USER_PASSWORD` - password of Facebook registered user
 
 ```
 # OKTA_IDX_ISSUER, OKTA_IDX_CLIENTID, OKTA_IDX_CLIENTSECRET,
