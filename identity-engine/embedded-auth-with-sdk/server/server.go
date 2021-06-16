@@ -32,8 +32,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	"github.com/howeyc/fsnotify"
-	"github.com/patrickmn/go-cache"
 	idx "github.com/okta/okta-idx-golang"
+	"github.com/patrickmn/go-cache"
 
 	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/config"
 	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/views"
@@ -767,7 +767,7 @@ func (s *Server) getProfileData(r *http.Request) map[string]string {
 		return m
 	}
 
-	reqUrl := s.config.Okta.IDX.Issuer + "/v1/userinfo"
+	reqUrl := s.config.Okta.IDX.Issuer + "/oauth2/v1/userinfo"
 
 	req, _ := http.NewRequest("GET", reqUrl, bytes.NewReader([]byte("")))
 	h := req.Header
