@@ -30,10 +30,14 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strings"
+	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
+	"github.com/howeyc/fsnotify"
 	verifier "github.com/okta/okta-jwt-verifier-golang"
 	"github.com/spf13/viper"
 )
@@ -54,15 +58,85 @@ type PKCE struct {
 }
 
 func init() {
-
-	tpl = template.Must(template.ParseGlob("templates/*"))
+	parseTemplates()
+	go watchForTemplates()
 
 	err := ReadConfig(cfg)
 	if err != nil {
 		fmt.Printf("failed to read config: %s\n", err.Error())
 		os.Exit(1)
 	}
+}
 
+func main() {
+	r := mux.NewRouter()
+	r.Use(loggingMiddleware)
+
+	r.HandleFunc("/", HomeHandler).Methods("GET")
+	r.HandleFunc("/login", LoginHandler).Methods("GET")
+	r.HandleFunc("/login/callback", LoginCallbackHandler).Methods("GET")
+	r.HandleFunc("/profile", ProfileHandler).Methods("GET")
+	r.HandleFunc("/logout", LogoutHandler).Methods("POST")
+
+	addr := "127.0.0.1:8080"
+	logger := log.New(os.Stderr, "http: ", log.LstdFlags)
+	srv := &http.Server{
+		Handler:      r,
+		Addr:         addr,
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+		ErrorLog:     logger,
+	}
+	log.Printf("running sample on addr %q\n", addr)
+
+	err := srv.ListenAndServe()
+	if err != nil {
+		log.Printf("the HTTP server failed to start: %s\n", err)
+		os.Exit(1)
+	}
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("%s: %s\n", r.Method, r.RequestURI)
+		next.ServeHTTP(w, r)
+	})
+}
+
+func parseTemplates() {
+	tpl = template.Must(template.ParseGlob("templates/*.gohtml"))
+}
+
+func viewPath(filename string) string {
+	return path.Join("templates/", filename)
+}
+
+func watchForTemplates() {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer watcher.Close()
+
+	err = watcher.Watch(viewPath(""))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		<-watcher.Event
+
+	wait:
+		select {
+		case <-watcher.Event:
+			goto wait
+		case <-time.After(time.Second):
+		}
+
+		log.Println("Parse Template triggered ... ")
+		parseTemplates()
+	}
 }
 
 // Creates a codeVerifier that is used for PKCE
@@ -103,21 +177,6 @@ func createPKCEData() (*PKCE, error) {
 
 }
 
-func main() {
-	http.HandleFunc("/", HomeHandler)
-	http.HandleFunc("/login", LoginHandler)
-	http.HandleFunc("/login/callback", LoginCallbackHandler)
-	http.HandleFunc("/profile", ProfileHandler)
-	http.HandleFunc("/logout", LogoutHandler)
-
-	log.Print("server starting at localhost:8080 ... ")
-	err := http.ListenAndServe("localhost:8080", nil)
-	if err != nil {
-		log.Printf("the HTTP server failed to start: %s\n", err)
-		os.Exit(1)
-	}
-}
-
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	type customData struct {
 		Profile         map[string]string
@@ -154,7 +213,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		pkce.CodeChallenge = session.Values["pkce_code_challenge"].(string)
 		pkce.CodeChallengeMethod = session.Values["pkce_code_challenge_method"].(string)
 	}
-	log.Printf("%+v\n", session.Values)
 	nonce, err := generateNonce()
 	if err != nil {
 		fmt.Printf("error: %s\n", err.Error())
@@ -175,7 +233,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Printf("could not get interactionHandle: %s\n", err.Error())
 	}
-	issuerParts, err := url.Parse(cfg.Okta.IDX.Issuer)
+	issuerURL := fmt.Sprintf("%s/", cfg.Okta.IDX.Issuer)
+	issuerParts, err := url.Parse(issuerURL)
 	if err != nil {
 		fmt.Printf("error: %s\n", err.Error())
 		os.Exit(1)
@@ -233,7 +292,7 @@ func LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	q.Add("client_secret", cfg.Okta.IDX.ClientSecret)
 	q.Add("code_verifier", session.Values["pkce_code_verifier"].(string))
 
-	url := cfg.Okta.IDX.Issuer + "/v1/token?" + q.Encode()
+	url := cfg.Okta.IDX.Issuer + "/oauth2/v1/token?" + q.Encode()
 
 	req, _ := http.NewRequest("POST", url, bytes.NewReader([]byte("")))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -309,7 +368,7 @@ func getProfileData(r *http.Request) map[string]string {
 		return m
 	}
 
-	reqUrl := cfg.Okta.IDX.Issuer + "/v1/userinfo"
+	reqUrl := cfg.Okta.IDX.Issuer + "/oauth2/v1/userinfo"
 
 	req, _ := http.NewRequest("GET", reqUrl, bytes.NewReader([]byte("")))
 	h := req.Header
@@ -384,8 +443,9 @@ func ReadConfig(c *config, opts ...viper.DecoderConfigOption) error {
 	v.AddConfigPath("$HOME/.okta/")                    // path to look for the config file in
 	v.AddConfigPath(".")                               // path to look for config in the working directory
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_")) // replace default viper delimiter for env vars
-	v.AutomaticEnv()
 	v.SetTypeByDefaultValue(true)
+	v.SetEnvPrefix("OKTA_IDX")
+	v.AutomaticEnv()
 	err := v.ReadInConfig()
 	if err != nil {
 		var vErr viper.ConfigFileNotFoundError
@@ -395,7 +455,23 @@ func ReadConfig(c *config, opts ...viper.DecoderConfigOption) error {
 	}
 	err = v.Unmarshal(c, opts...)
 	if err != nil {
-		return fmt.Errorf("failed to parse configuration: %w", err)
+		return fmt.Errorf("failed to parse configuration file, will attempt config from env vars next. Error: %w", err)
+	}
+
+	if c.Okta.IDX.ClientID == "" {
+		c.Okta.IDX.ClientID = fmt.Sprintf("%v", v.Get("CLIENTID"))
+	}
+	if c.Okta.IDX.ClientSecret == "" {
+		c.Okta.IDX.ClientSecret = fmt.Sprintf("%v", v.Get("CLIENTSECRET"))
+	}
+	if c.Okta.IDX.Issuer == "" {
+		c.Okta.IDX.Issuer = fmt.Sprintf("%v", v.Get("ISSUER"))
+	}
+	if len(c.Okta.IDX.Scopes) == 0 {
+		c.Okta.IDX.Scopes = strings.Split(fmt.Sprintf("%v", v.Get("SCOPES")), ",")
+	}
+	if c.Okta.IDX.RedirectURI == "" {
+		c.Okta.IDX.RedirectURI = fmt.Sprintf("%v", v.Get("REDIRECTURI"))
 	}
 	return nil
 }
@@ -433,7 +509,7 @@ func getInteractionHandle(codeChallenge string) (string, error) {
 	data.Set("redirect_uri", cfg.Okta.IDX.RedirectURI)
 	data.Set("state", state)
 
-	endpoint := cfg.Okta.IDX.Issuer + "/v1/interact"
+	endpoint := cfg.Okta.IDX.Issuer + "/oauth2/v1/interact"
 	req, err := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(data.Encode()))
 	if err != nil {
 		return "", fmt.Errorf("failed to create interact http request: %w", err)

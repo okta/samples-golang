@@ -68,6 +68,9 @@ func ReadConfig(config interface{}, opts ...viper.DecoderConfigOption) error {
 		}
 	}
 	err = v.Unmarshal(config, opts...)
+	if err != nil {
+		return fmt.Errorf("failed to parse configuration file, will attempt config from env vars next. Error: %w", err)
+	}
 
 	c := config.(*Config)
 	if c.Okta.IDX.ClientID == "" {
@@ -84,9 +87,6 @@ func ReadConfig(config interface{}, opts ...viper.DecoderConfigOption) error {
 	}
 	if c.Okta.IDX.RedirectURI == "" {
 		c.Okta.IDX.RedirectURI = fmt.Sprintf("%v", v.Get("REDIRECTURI"))
-	}
-	if err != nil {
-		return fmt.Errorf("failed to parse configuration: %w", err)
 	}
 	return nil
 }
