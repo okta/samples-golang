@@ -132,7 +132,7 @@ func (th *TestHarness) isView(rawURL string) error {
 		return err
 	}
 	u, _ := url.Parse(currentURL)
-	currentURL = u.Scheme+"://"+u.Host+u.Path
+	currentURL = u.Scheme + "://" + u.Host + u.Path
 	if strings.Contains(currentURL, "localhost") {
 		currentURL = strings.ReplaceAll(currentURL, "localhost", "127.0.0.1")
 	}
@@ -790,14 +790,14 @@ func (th *TestHarness) createCurrentProfile(name string) error {
 }
 
 func (th *TestHarness) selectsEmail() error {
-	if err := th.clicksFormCheckItem(`input[name="push_email"]`, th.waitForEnrollFactorForm); err != nil {
+	if err := th.clicksFormCheckItem(`input[id="push_email"]`, th.waitForEnrollFactorForm); err != nil {
 		return err
 	}
 	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
 }
 
 func (th *TestHarness) selectsPhone() error {
-	if err := th.clicksFormCheckItem(`input[name="push_phone"]`, th.waitForEnrollFactorForm); err != nil {
+	if err := th.clicksFormCheckItem(`input[id="push_phone"]`, th.waitForEnrollFactorForm); err != nil {
 		return err
 	}
 	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
