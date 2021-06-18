@@ -66,7 +66,7 @@ okta:
     clientId: {clientId}
     clientSecret: {clientSecret}
     issuer: https://{yourOktaDomain}
-    redirectUri: http://localhost:8080/login/callback
+    redirectUri: http://localhost:8000/login/callback
     scopes:
       - openid
       - profile
@@ -92,7 +92,7 @@ Now start the app server:
 go run main.go
 ```
 
-Now navigate to http://localhost:8080 in your browser.
+Now navigate to http://localhost:8000 in your browser.
 
 If you see a home page that prompts you to login, then things are working!  Clicking the **Log in** button will redirect you to the applicaitons custom sign-in page.
 
