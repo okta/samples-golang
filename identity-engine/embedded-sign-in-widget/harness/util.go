@@ -74,7 +74,7 @@ func (th *TestHarness) facebookUser() error {
 		Password:     os.Getenv("OKTA_IDX_FACEBOOK_USER_PASSWORD"),
 		GivenName:    "Golang",
 		FamilyName:   "User",
-		DisplayName:  "Golang SDK User",
+		DisplayName:  "Golang SDK Test User",
 	}
 	return nil
 }
@@ -88,7 +88,7 @@ func (th *TestHarness) clicksSigninWithGoogle() error {
 }
 
 func (th *TestHarness) clicksSigninWithFacebook() error {
-	if err := th.clickLink("Sign in with Google"); err != nil {
+	if err := th.clickLink("Sign in with Facebook"); err != nil {
 		return err
 	}
 
