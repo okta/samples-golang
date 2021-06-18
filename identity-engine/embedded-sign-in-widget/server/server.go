@@ -104,7 +104,7 @@ func (s *Server) Run() {
 	r.HandleFunc("/profile", s.ProfileHandler).Methods("GET")
 	r.HandleFunc("/logout", s.LogoutHandler).Methods("POST")
 
-	addr := "localhost:8080"
+	addr := "localhost:8000"
 	logger := log.New(os.Stderr, "http: ", log.LstdFlags)
 	srv := &http.Server{
 		Handler:      r,
@@ -273,11 +273,11 @@ func (s *Server) LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 
 	session.Values["id_token"] = exchange.IdToken
 	session.Values["access_token"] = exchange.AccessToken
-
-	err = session.Save(r, w)
-	if err != nil {
+	if err = session.Save(r, w); err != nil {
 		log.Fatalf("SESSION SAVE ERROR: %+v\n", err.Error())
 	}
+	s.cache.Add(fmt.Sprintf("%s-id_token", session.ID), exchange.IdToken, time.Hour)
+	s.cache.Add(fmt.Sprintf("%s-access_token", session.ID), exchange.AccessToken, time.Hour)
 
 	http.Redirect(w, r, "/", http.StatusFound)
 }
@@ -303,6 +303,8 @@ func (s *Server) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 
 	delete(session.Values, "id_token")
 	delete(session.Values, "access_token")
+	s.cache.Delete(fmt.Sprintf("%s-id_token", session.ID))
+	s.cache.Delete(fmt.Sprintf("%s-access_token", session.ID))
 
 	session.Save(r, w)
 
@@ -344,7 +346,11 @@ func (s *Server) getProfileData(r *http.Request) map[string]string {
 
 	session, err := s.sessionStore.Get(r, SESSION_STORE_NAME)
 
-	if err != nil || session.Values["access_token"] == nil || session.Values["access_token"] == "" {
+	accessToken := session.Values["access_token"]
+	if accessToken == nil || accessToken == "" {
+		accessToken, _ = s.cache.Get(fmt.Sprintf("%s-access_token", session.ID))
+	}
+	if err != nil || accessToken == nil || accessToken == "" {
 		return m
 	}
 
@@ -352,7 +358,7 @@ func (s *Server) getProfileData(r *http.Request) map[string]string {
 
 	req, _ := http.NewRequest("GET", reqUrl, bytes.NewReader([]byte("")))
 	h := req.Header
-	h.Add("Authorization", "Bearer "+session.Values["access_token"].(string))
+	h.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	h.Add("Accept", "application/json")
 
 	client := &http.Client{}
@@ -366,8 +372,11 @@ func (s *Server) getProfileData(r *http.Request) map[string]string {
 
 func (s *Server) isAuthenticated(r *http.Request) bool {
 	session, err := s.sessionStore.Get(r, SESSION_STORE_NAME)
-
-	if err != nil || session.Values["id_token"] == nil || session.Values["id_token"] == "" {
+	idToken := session.Values["id_token"]
+	if idToken == nil || idToken == "" {
+		idToken, _ = s.cache.Get(fmt.Sprintf("%s-id_token", session.ID))
+	}
+	if err != nil || idToken == nil || idToken == "" {
 		return false
 	}
 

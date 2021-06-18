@@ -29,6 +29,10 @@ import (
 	"github.com/tebeka/selenium"
 )
 
+const (
+	ROOT_VIEW_H1 = "Self Hosted Widget + Golang Example"
+)
+
 func defaultTimeout() time.Duration {
 	return time.Duration(time.Second * 10)
 }
@@ -53,6 +57,110 @@ func claimItem(key string) string {
 	return value
 }
 
+func (th *TestHarness) googleUser() error {
+	th.currentProfile = &A18NProfile{
+		EmailAddress: os.Getenv("OKTA_IDX_GOOGLE_USER_NAME"),
+		Password:     os.Getenv("OKTA_IDX_GOOGLE_USER_PASSWORD"),
+		GivenName:    "Golang",
+		FamilyName:   "User",
+		DisplayName:  "Golang SDK User",
+	}
+	return nil
+}
+
+func (th *TestHarness) facebookUser() error {
+	th.currentProfile = &A18NProfile{
+		EmailAddress: os.Getenv("OKTA_IDX_FACEBOOK_USER_NAME"),
+		Password:     os.Getenv("OKTA_IDX_FACEBOOK_USER_PASSWORD"),
+		GivenName:    "Golang",
+		FamilyName:   "User",
+		DisplayName:  "Golang SDK User",
+	}
+	return nil
+}
+
+func (th *TestHarness) clicksSigninWithGoogle() error {
+	if err := th.clickLink("Sign in with Google"); err != nil {
+		return err
+	}
+
+	return th.seesElementWithText(`div`, `Sign in with Google`)
+}
+
+func (th *TestHarness) clicksSigninWithFacebook() error {
+	if err := th.clickLink("Sign in with Google"); err != nil {
+		return err
+	}
+
+	return th.seesElementWithText(`div`, `Log Into Facebook`)
+}
+
+func (th *TestHarness) signsInWithGoogle() error {
+	if err := th.fillsInFormValue(`input[name="identifier"]`, th.currentProfile.EmailAddress, th.waitForGenericForm); err != nil {
+		return err
+	}
+
+	if err := th.clickSpan("Next"); err != nil {
+		return nil
+	}
+
+	if err := th.fillsInFormValue(`input[name="password"]`, th.currentProfile.Password, th.waitForGenericForm); err != nil {
+		return err
+	}
+
+	if err := th.clickSpan("Next"); err != nil {
+		return nil
+	}
+
+	return th.seesElement(`html body h1`)
+}
+
+func (th *TestHarness) signsInWithFacebook() error {
+	if err := th.fillsInFormValue(`input[name="email"]`, th.currentProfile.EmailAddress, th.waitForGenericForm); err != nil {
+		return err
+	}
+
+	if err := th.fillsInFormValue(`input[name="pass"]`, th.currentProfile.Password, th.waitForGenericForm); err != nil {
+		return err
+	}
+
+	if err := th.clicksButtonWithText(`button[id="loginbutton"]`, "Log In"); err != nil {
+		return nil
+	}
+
+	return th.seesElement(`html body h1`)
+}
+
+func (th *TestHarness) waitForFacebookLoginForm() error {
+	return th.seesElement(`form[id="login_form"]`)
+}
+
+func (th *TestHarness) clicksButtonWithText(selector, text string) error {
+	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
+		if err != nil {
+			return false, nil
+		}
+
+		elemText, err := elem.Text()
+		if err != nil {
+			return false, nil
+		}
+
+		if strings.TrimSpace(elemText) != text {
+			return false, nil
+		}
+
+		if err = elem.Click(); err != nil {
+			return false, err
+		}
+
+		return true, nil
+	}, defaultTimeout(), defaultInterval())
+
+	return err
+}
+
 func (th *TestHarness) navigateToTheRootView() error {
 	rootURL := fmt.Sprintf("http://%s/", th.server.Address())
 	err := th.wd.Get(rootURL)
@@ -64,7 +172,7 @@ func (th *TestHarness) navigateToTheRootView() error {
 }
 
 func (th *TestHarness) isRootView() error {
-	if err := th.waitForPageRender(); err != nil {
+	if err := th.seesElementWithText(`h1`, ROOT_VIEW_H1); err != nil {
 		return err
 	}
 	return th.isView("/")
@@ -92,6 +200,35 @@ func (th *TestHarness) waitForLoginForm() error {
 		return err
 	}
 	return th.seesElement(`form[action="/login"]`)
+}
+
+func (th *TestHarness) waitForGenericForm() error {
+	return th.seesElement(`form[method="post"]`)
+}
+
+func (th *TestHarness) seesElementWithText(selector, text string) error {
+	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elems, err := th.wd.FindElements(selenium.ByCSSSelector, selector)
+		if err != nil {
+			return false, nil
+		}
+
+		for _, elem := range elems {
+
+			elemText, err := elem.Text()
+			if err != nil {
+				return false, nil
+			}
+
+			if strings.TrimSpace(elemText) == text {
+				return true, nil
+			}
+		}
+
+		return false, nil
+	}, defaultTimeout(), defaultInterval())
+
+	return err
 }
 
 func (th *TestHarness) seesClaimsTableItemAndValueFromCurrentProfile(key string) error {
@@ -200,6 +337,33 @@ func (th *TestHarness) clickLink(text string) error {
 	return err
 }
 
+func (th *TestHarness) clickSpan(text string) error {
+	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elems, err := th.wd.FindElements(selenium.ByCSSSelector, `span`)
+		if err != nil {
+			return false, nil
+		}
+
+		for _, elem := range elems {
+			elemText, err := elem.Text()
+
+			if strings.TrimSpace(elemText) != text {
+				continue
+			}
+
+			if err = elem.Click(); err != nil {
+				return false, err
+			}
+
+			return true, nil
+		}
+
+		return false, nil
+	}, defaultTimeout(), defaultInterval())
+
+	return err
+}
+
 func (th *TestHarness) entersText(selector, text string) error {
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
@@ -282,9 +446,8 @@ func (th *TestHarness) submitsLoginForm() error {
 	if err != nil {
 		return err
 	}
-	// FIXME the login is done with ajax, find a more elegant way to wait other than sleeping
-	time.Sleep(5 * time.Second)
-	return th.waitForPageRender()
+
+	return th.seesElementWithText(`h1`, ROOT_VIEW_H1)
 }
 
 func (th *TestHarness) destroyCurrentProfile() error {
