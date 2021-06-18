@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/spf13/viper"
 )
 
@@ -36,16 +35,6 @@ type Config struct {
 		} `mapstructure:"idx"`
 	} `mapstructure:"okta"`
 	Testing bool
-}
-
-func (c *Config) Validate() error {
-	return validation.ValidateStruct(&c.Okta.IDX,
-		validation.Field(&c.Okta.IDX.ClientID, validation.Required),
-		validation.Field(&c.Okta.IDX.ClientSecret, validation.Required),
-		validation.Field(&c.Okta.IDX.Issuer, validation.Required),
-		validation.Field(&c.Okta.IDX.Scopes, validation.Required),
-		validation.Field(&c.Okta.IDX.RedirectURI, validation.Required),
-	)
 }
 
 // ReadConfig reads config from file and environment variables.  Config file

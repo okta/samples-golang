@@ -52,26 +52,44 @@ go get
 You also need to gather the following information from the Okta Developer Console:
 
 - **Client ID** and **Client Secret** - These can be found on the "General" tab of the Web application that you created earlier in the Okta Developer Console.
-- **Issuer** - This is the URL of the authorization server that will perform authentication.  All Developer Accounts have a "default" authorization server.  The issuer is a combination of your Org URL (found in the upper right of the console home page) and `/oauth2/default`. For example, `https://dev-1234.oktapreview.com/oauth2/default`.
+- **Issuer** - This is the URL of the authorization server that will perform authentication.  All Developer Accounts have a "default" authorization server.  The issuer is the scheme and your Org URL without trailing slash. For example, `https://dev-1234.oktapreview.com/oauth2/default`.
 
-For environment variables, we use [viper]. You can create a `~/.okta/okta.yaml` file with the following
+The app can find its Okta config variables in `$HOME/.okta/okta.yaml`
+and/or it can use the environment variables for the configuration.
+
+When formatting environment variables in a `~/.okta/okta.yaml` file use the
+following format.
 
 ```yaml
 okta:
   idx:
     clientId: {clientId}
     clientSecret: {clientSecret}
-    issuer: https://{yourOktaDomain}/oauth2/default
+    issuer: https://{yourOktaDomain}
     redirectUri: http://localhost:8080/login/callback
     scopes:
       - openid
       - profile
 ```
 
+When setting environment variables directly in a shell use the following keys.
+
+| Yaml Path             | Environment Key       | Description                                                                  |
+|-----------------------|-----------------------|------------------------------------------------------------------------------|
+| okta.idx.issuer       | OKTA_IDX_ISSUER       | The issuer of the authorization server used for authentication               |
+| okta.idx.clientId     | OKTA_IDX_CLIENTID     | The client ID of the Okta Application.                                       |
+| okta.idx.clientSecret | OKTA_IDX_CLIENTSECRET | The client secret of the Okta Application Required with confidential clients |
+| okta.idx.scopes       | OKTA_IDX_SCOPES       | The scopes requested for the access token                                    |
+| okta.idx.redirectUri  | OKTA_IDX_REDIRECTURI  | The URI to redirect the application to after authentication (optional)       |
+
+Note, the example app attempts to read the `okta.yaml` first first and will then
+override any specific values if the corresponding environment variable is found
+in the shell.
+
 Now start the app server:
 
 ```
-go run .
+go run main.go
 ```
 
 Now navigate to http://localhost:8080 in your browser.

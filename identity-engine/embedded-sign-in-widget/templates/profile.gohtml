@@ -2,7 +2,7 @@
 <div id="content" class="container">
 
   <div>
-    <h2>My Profile</h2>
+    <h1>My Profile</h1>
     <p>Hello, <span>{{ .Profile.name }}</span>. Below is the information that was read from the userinfo endpoint with
       your <a href="https://developer.okta.com/docs/api/resources/oidc.html#get-user-information" target="_blank">Access Token</a> .
     </p>
@@ -19,8 +19,8 @@
     <tbody>
       {{ range $key, $value := .Profile }}
         <tr>
-          <td>{{ $key }}</td>
-          <td id="claim-{{$key}}">{{ $value }}</td>
+          <td id="{{$key}}-key">{{ $key }}</td>
+          <td id="{{$key}}-value">{{ $value }}</td>
         </tr>
       {{ end }}
     </tbody>
