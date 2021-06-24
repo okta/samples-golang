@@ -243,7 +243,12 @@ func (s *Server) LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	q.Add("client_secret", s.config.Okta.IDX.ClientSecret)
 	q.Add("code_verifier", session.Values["pkce_code_verifier"].(string))
 
-	url := s.config.Okta.IDX.Issuer + "/oauth2/v1/token?" + q.Encode()
+	var url string
+	if strings.Contains(s.config.Okta.IDX.Issuer, "oauth2") {
+		url = s.config.Okta.IDX.Issuer + "/v1/token?" + q.Encode()
+	} else {
+		url = s.config.Okta.IDX.Issuer + "/oauth2/v1/token?" + q.Encode()
+	}
 
 	req, _ := http.NewRequest("POST", url, bytes.NewReader([]byte("")))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -271,11 +276,6 @@ func (s *Server) LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		log.Fatalf("Verification Error: %+v\n", verificationError)
 	}
 
-	session.Values["id_token"] = exchange.IdToken
-	session.Values["access_token"] = exchange.AccessToken
-	if err = session.Save(r, w); err != nil {
-		log.Fatalf("SESSION SAVE ERROR: %+v\n", err.Error())
-	}
 	s.cache.Add(fmt.Sprintf("%s-id_token", session.ID), exchange.IdToken, time.Hour)
 	s.cache.Add(fmt.Sprintf("%s-access_token", session.ID), exchange.AccessToken, time.Hour)
 
@@ -296,18 +296,7 @@ func (s *Server) ProfileHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) LogoutHandler(w http.ResponseWriter, r *http.Request) {
-	session, err := s.sessionStore.Get(r, SESSION_STORE_NAME)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-
-	delete(session.Values, "id_token")
-	delete(session.Values, "access_token")
-	s.cache.Delete(fmt.Sprintf("%s-id_token", session.ID))
-	s.cache.Delete(fmt.Sprintf("%s-access_token", session.ID))
-
-	session.Save(r, w)
-
+	s.cache.Flush()
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
@@ -331,7 +320,7 @@ func (s *Server) verifyToken(t string) (*verifier.Jwt, error) {
 	result, err := jv.New().VerifyIdToken(t)
 
 	if err != nil {
-		return nil, fmt.Errorf("%s", err)
+		return nil, fmt.Errorf("%s; token: %s", err, t)
 	}
 
 	if result != nil {
@@ -354,7 +343,12 @@ func (s *Server) getProfileData(r *http.Request) map[string]string {
 		return m
 	}
 
-	reqUrl := s.config.Okta.IDX.Issuer + "/oauth2/v1/userinfo"
+	var reqUrl string
+	if strings.Contains(s.config.Okta.IDX.Issuer, "oauth2") {
+		reqUrl = s.config.Okta.IDX.Issuer + "/v1/userinfo"
+	} else {
+		reqUrl = s.config.Okta.IDX.Issuer + "/oauth2/v1/userinfo"
+	}
 
 	req, _ := http.NewRequest("GET", reqUrl, bytes.NewReader([]byte("")))
 	h := req.Header
@@ -443,7 +437,13 @@ func (s *Server) getInteractionHandle(codeChallenge string) (string, error) {
 	data.Set("redirect_uri", s.config.Okta.IDX.RedirectURI)
 	data.Set("state", s.state)
 
-	endpoint := s.config.Okta.IDX.Issuer + "/oauth2/v1/interact"
+	var endpoint string
+	if strings.Contains(s.config.Okta.IDX.Issuer, "oauth2") {
+		endpoint = s.config.Okta.IDX.Issuer + "/v1/interact"
+	} else {
+		endpoint = s.config.Okta.IDX.Issuer + "/oauth2/v1/interact"
+	}
+
 	req, err := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(data.Encode()))
 	if err != nil {
 		return "", fmt.Errorf("failed to create interact http request: %w", err)

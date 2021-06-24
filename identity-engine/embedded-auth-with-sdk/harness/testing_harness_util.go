@@ -1053,7 +1053,7 @@ func (th *TestHarness) facebookUser() error {
 }
 
 func (th *TestHarness) clicksLoginWithFacebook() error {
-	return th.clicksButtonWithText(`span[class="px-4"]`, "Facebook IdP")
+	return th.clicksButtonWithText(`span[class="px-4"]`, "FB IdP")
 }
 
 func (th *TestHarness) waitForFacebookLoginForm() error {

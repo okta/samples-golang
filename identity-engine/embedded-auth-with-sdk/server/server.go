@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -767,7 +768,12 @@ func (s *Server) getProfileData(r *http.Request) map[string]string {
 		return m
 	}
 
-	reqUrl := s.config.Okta.IDX.Issuer + "/oauth2/v1/userinfo"
+	var reqUrl string
+	if strings.Contains(s.config.Okta.IDX.Issuer, "oauth2") {
+		reqUrl = s.config.Okta.IDX.Issuer + "/v1/userinfo"
+	} else {
+		reqUrl = s.config.Okta.IDX.Issuer + "/oauth2/v1/userinfo"
+	}
 
 	req, _ := http.NewRequest("GET", reqUrl, bytes.NewReader([]byte("")))
 	h := req.Header
