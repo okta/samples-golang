@@ -9,7 +9,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/sessions v1.2.1
 	github.com/howeyc/fsnotify v0.9.0
-	github.com/okta/okta-idx-golang v0.0.0-20210616214838-3b5b783f92a3
+	github.com/okta/okta-idx-golang v0.0.0-20210624162636-dca80a2d6699
 	github.com/okta/okta-sdk-golang/v2 v2.3.1-0.20210519105407-20ace51aad26
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/spf13/pflag v1.0.5
