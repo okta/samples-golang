@@ -9,7 +9,7 @@
               <div class="rounded-lg bg-white overflow-hidden shadow">
                 <div class="p-6">
 
-                  <h1 class="text-4xl pb-4">Second Factor Login</h1>
+                  <h1 class="text-4xl pb-4">Factor Login</h1>
 
                   <form class="space-y-6" action="/login/factors/phone" method="GET">
                     {{if ne .Errors ""}}
@@ -32,7 +32,7 @@
                         <p class="text-sm text-gray-500">Please choose the method for this factor</p>
                         <div class="mt-4 space-y-4">
                           <div class="flex items-center">
-                            <input id="voice" name="phoneMethod" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
+                            <input id="voice" name="phoneMethod" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" checked>
                             <label for="voice" class="ml-3 block text-sm font-medium text-gray-700">
                               Voice
                             </label>

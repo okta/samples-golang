@@ -243,11 +243,12 @@ func (s *Server) enrollFactor(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleEnrollFactor(w http.ResponseWriter, r *http.Request) {
-	if r.FormValue("push_email") != "" {
+	pushFactor := r.FormValue("push_factor")
+	if pushFactor == "push_email" {
 		http.Redirect(w, r, "/enrollEmail", http.StatusFound)
 		return
 	}
-	if r.FormValue("push_phone") != "" {
+	if pushFactor == "push_phone" {
 		http.Redirect(w, r, "/enrollPhone", http.StatusFound)
 		return
 	}
@@ -356,12 +357,7 @@ func (s *Server) enrollPhone(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) enrollPhoneMethod(w http.ResponseWriter, r *http.Request) {
-	session, err := sessionStore.Get(r, "direct-auth")
-	if err != nil {
-		log.Fatalf("could not get store: %s", err)
-	}
-	session.Values["phoneNumber"] = r.FormValue("phoneNumber")
-	session.Save(r, w)
+	s.cache.Set("phoneNumber", r.FormValue("phoneNumber"), time.Minute*5)
 	s.render("enrollPhoneMethod.gohtml", w, r)
 }
 
@@ -414,7 +410,7 @@ func (s *Server) handleEnrollPhoneMethod(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		log.Fatalf("could not get store: %s", err)
 	}
-	pn := session.Values["phoneNumber"]
+	pn, _ := s.cache.Get("phoneNumber")
 	if pn == nil {
 		session.Values["Errors"] = "Invalid phone phone Number"
 		session.Save(r, w)
@@ -422,12 +418,12 @@ func (s *Server) handleEnrollPhoneMethod(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var pm idx.PhoneOption
-	spm := session.Values["phoneMethod"]
+	spm, _ := s.cache.Get("phoneMethod")
 	if spm != nil {
 		pm = spm.(idx.PhoneOption)
-	} else if r.FormValue("voice") != "" {
+	} else if r.FormValue("mobile_factor") == "voice" {
 		pm = idx.PhoneMethodVoiceCall
-	} else if r.FormValue("sms") != "" {
+	} else if r.FormValue("mobile_factor") == "sms" {
 		pm = idx.PhoneMethodSMS
 	} else {
 		session.Values["Errors"] = "Unsupported phone method"
@@ -435,8 +431,7 @@ func (s *Server) handleEnrollPhoneMethod(w http.ResponseWriter, r *http.Request)
 		http.Redirect(w, r, "/enrollPhone/method", http.StatusFound)
 		return
 	}
-	session.Values["phoneMethod"] = pm
-	session.Save(r, w)
+	s.cache.Set("phoneMethod", pm, time.Minute*6)
 
 	cer, _ := s.cache.Get("enrollResponse")
 	enrollResponse := cer.(*idx.EnrollmentResponse)
