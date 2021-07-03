@@ -98,11 +98,12 @@ func (s *Server) handleLoginSecondaryFactors(w http.ResponseWriter, r *http.Requ
 
 func (s *Server) handleLoginSecondaryFactorsProceed(w http.ResponseWriter, r *http.Request) {
 	delete(s.ViewData, "InvalidEmailCode")
-	if r.FormValue("push_email") != "" {
+	pushFactor := r.FormValue("push_factor")
+	if pushFactor == "push_email" {
 		http.Redirect(w, r, "/login/factors/email", http.StatusFound)
 		return
 	}
-	if r.FormValue("push_phone") != "" {
+	if pushFactor == "push_phone" {
 		http.Redirect(w, r, "/login/factors/phone/method", http.StatusFound)
 		return
 	}

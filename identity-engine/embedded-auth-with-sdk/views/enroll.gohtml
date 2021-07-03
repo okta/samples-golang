@@ -24,7 +24,7 @@
                         <div class="mt-4 space-y-4">
                           {{if .FactorEmail}}
                             <div class="flex items-center">
-                              <input id="push_email" name="push_factor" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" checked>
+                              <input id="push_email" name="push_factor" value="push_email" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" checked>
                               <label for="push_email" class="ml-3 block text-sm font-medium text-gray-700">
                                 Email
                               </label>
@@ -32,7 +32,7 @@
                           {{end}}
                           {{if .FactorPhone}}
                             <div class="flex items-center">
-                              <input id="push_phone" name="push_factor" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"{{if not .FactorEmail}} checked{{end}}>
+                              <input id="push_phone" name="push_factor" value="push_phone" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"{{if not .FactorEmail}} checked{{end}}>
                               <label for="push_phone" class="ml-3 block text-sm font-medium text-gray-700">
                                 Phone
                               </label>
