@@ -442,9 +442,12 @@ func (th *TestHarness) submitsForm(selector, text string) error {
 }
 
 func (th *TestHarness) submitsLoginForm() error {
-	err := th.submitsForm(`input[type="submit"]`, "Next")
+	err := th.submitsForm(`input[type="submit"]`, "Sign in")
 	if err != nil {
-		return err
+		err = th.submitsForm(`input[type="submit"]`, "Next")
+		if err != nil {
+			return err
+		}
 	}
 
 	return th.seesElementWithText(`h1`, ROOT_VIEW_H1)
