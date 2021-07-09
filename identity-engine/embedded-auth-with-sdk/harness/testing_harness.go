@@ -54,6 +54,7 @@ type A18NProfile struct {
 	GivenName    string
 	FamilyName   string
 	UserID       string
+	ErrorDesc    string `json:"errorDescription"`
 }
 
 type A18NProfiles struct {
