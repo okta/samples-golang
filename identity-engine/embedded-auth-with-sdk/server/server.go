@@ -64,7 +64,7 @@ func NewServer(c *config.Config) *Server {
 		idx.WithScopes(c.Okta.IDX.Scopes),
 		idx.WithRedirectURI(c.Okta.IDX.RedirectURI))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("new client error: %+v", err)
 	}
 
 	return &Server{
@@ -220,25 +220,36 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 func (s *Server) enrollFactor(w http.ResponseWriter, r *http.Request) {
 	cer, _ := s.cache.Get("enrollResponse")
 	enrollResponse := cer.(*idx.EnrollmentResponse)
+	phoneFactor := false
+	emailFactor := false
+	canSkip := false
+	showSkip := false
+
 	if enrollResponse.HasStep(idx.EnrollmentStepSkip) {
-		s.ViewData["skip"] = true
-	} else {
-		s.ViewData["skip"] = false
+		canSkip = true
 	}
+	s.ViewData["skip"] = canSkip
+
 	if enrollResponse.HasStep(idx.EnrollmentStepPhoneVerification) {
-		s.ViewData["FactorPhone"] = true
-	} else {
-		s.ViewData["FactorPhone"] = false
+		phoneFactor = true
 	}
+	s.ViewData["FactorPhone"] = phoneFactor
+
 	if enrollResponse.HasStep(idx.EnrollmentStepEmailVerification) {
-		s.ViewData["FactorEmail"] = true
-	} else {
-		s.ViewData["FactorEmail"] = false
+		emailFactor = true
 	}
+	s.ViewData["FactorEmail"] = emailFactor
+
+	if enrollResponse.HasStep(idx.EnrollmentStepSkip) && (phoneFactor || emailFactor) {
+		showSkip = true
+	}
+	s.ViewData["showSkipButton"] = showSkip
+
 	if errors, ok := s.cache.Get("Errors"); ok {
 		s.ViewData["Errors"] = errors
 		s.cache.Delete("Errors")
 	}
+
 	s.render("enroll.gohtml", w, r)
 }
 
@@ -690,21 +701,21 @@ func (s *Server) parseTemplates() {
 	s.tpl, err = t.Funcs(s.view.TemplateFuncs()).ParseGlob("views/*.gohtml")
 
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("parse templates error: %+v", err)
 	}
 }
 
 func (s *Server) watchForTemplates() {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("watch templates error: %+v", err)
 	}
 
 	defer watcher.Close()
 
 	err = watcher.Watch(viewPath(""))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("watching templates error: %+v", err)
 	}
 
 	for {
@@ -748,7 +759,7 @@ func (s *Server) render(t string, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.tpl.ExecuteTemplate(w, t, s.ViewData); err != nil {
-		log.Fatal(err)
+		log.Fatalf("execute templates error: %+v", err)
 	}
 
 	s.ViewData["Errors"] = ""
