@@ -17,7 +17,7 @@ func (th *TestHarness) fillInOrgInfo() {
 	th.org = orgData{}
 	groups, _, err := th.oktaClient.Group.ListGroups(context.Background(), &query.Params{Limit: 20})
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("list groups error: %+v", err)
 	}
 	for _, v := range groups {
 		if v.Profile.Name == "Everyone" {
@@ -29,19 +29,19 @@ func (th *TestHarness) fillInOrgInfo() {
 	}
 	apps, _, err := th.oktaClient.Application.ListApplications(context.Background(), &query.Params{Q: "Golang IDX Web App"})
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("list apps error: %+v", err)
 	}
 	if len(apps) != 1 {
 		log.Fatal("more than one app with name 'Golang IDX Web App' exists")
 	}
 	req, err := th.oktaClient.GetRequestExecutor().NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/policies?type=Okta:SignOn&resourceId=%s", apps[0].(*okta.Application).Id), nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("new request error: %+v", err)
 	}
 	var policies []okta.Policy
 	_, err = th.oktaClient.GetRequestExecutor().Do(context.Background(), req, &policies)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("do request error: %+v", err)
 	}
 	for _, v := range policies {
 		if v.Name == "Golang IDX Web App" {
@@ -51,12 +51,12 @@ func (th *TestHarness) fillInOrgInfo() {
 	}
 	req, err = th.oktaClient.GetRequestExecutor().NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/policies/%s/rules", th.org.policyID), nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("new request error: %+v", err)
 	}
 	var rules []OktaAppSignOnPolicyRule
 	_, err = th.oktaClient.GetRequestExecutor().Do(context.Background(), req, &rules)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("do request error: %+v", err)
 	}
 	for _, v := range rules {
 		if v.Name != "MFA Rule" {

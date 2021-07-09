@@ -54,6 +54,7 @@ type A18NProfile struct {
 	GivenName    string
 	FamilyName   string
 	UserID       string
+	ErrorDesc    string `json:"errorDescription"`
 }
 
 type A18NProfiles struct {
@@ -115,11 +116,11 @@ func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 		}
 		err := config.ReadConfig(cfg)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("read config error: %+v", err)
 		}
 		orgUrl, err := url.Parse(cfg.Okta.IDX.Issuer)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("url parse error: %+v", err)
 		}
 		_, client, err := okta.NewClient(
 			context.Background(),
@@ -128,7 +129,7 @@ func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 			okta.WithHttpClientPtr(th.httpClient),
 		)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("init test suite new client error: %+v", err)
 		}
 		srv := server.NewServer(cfg)
 		th.server = srv

@@ -1002,6 +1002,9 @@ func (th *TestHarness) createProfile(name string) (*A18NProfile, error) {
 	if err != nil {
 		return nil, err
 	}
+	if profile.ErrorDesc != "" {
+		return nil, fmt.Errorf("there was an A18N API error: %s", profile.ErrorDesc)
+	}
 
 	givenFamily := strings.Split(name, " ")
 	profile.GivenName = givenFamily[0]
