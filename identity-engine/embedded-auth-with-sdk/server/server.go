@@ -143,8 +143,10 @@ func (s *Server) Run() {
 		}
 		delete(session.Values, "id_token")
 		delete(session.Values, "access_token")
-
+		delete(session.Values, "Errors")
 		session.Save(r, w)
+
+		s.cache.Flush()
 
 		http.Redirect(w, r, "/", http.StatusFound)
 	}).Methods("POST")
