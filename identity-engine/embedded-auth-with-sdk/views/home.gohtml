@@ -8,6 +8,10 @@
             <section>
               <div class="rounded-lg bg-white overflow-hidden shadow">
                 <div class="p-6">
+                  {{if ne .Errors ""}}
+                    {{template "_error" .Errors}}
+                  {{end}}
+
                   {{if not .Authenticated}}
                   <h1 class="text-4xl pb-4">Welcome to the Okta Samples for Golang!</h1>
                   <p>

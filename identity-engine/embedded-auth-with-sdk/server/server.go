@@ -138,13 +138,14 @@ func (s *Server) Run() {
 	r.HandleFunc("/", s.home)
 	r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
 		session, err := sessionStore.Get(r, "direct-auth")
-		if err != nil {
-			log.Fatalf("could not get store: %s", err)
+		if err == nil {
+			delete(session.Values, "id_token")
+			delete(session.Values, "access_token")
+			delete(session.Values, "Errors")
+			session.Save(r, w)
 		}
-		delete(session.Values, "id_token")
-		delete(session.Values, "access_token")
 
-		session.Save(r, w)
+		s.cache.Flush()
 
 		http.Redirect(w, r, "/", http.StatusFound)
 	}).Methods("POST")
@@ -222,13 +223,12 @@ func (s *Server) enrollFactor(w http.ResponseWriter, r *http.Request) {
 	enrollResponse := cer.(*idx.EnrollmentResponse)
 	phoneFactor := false
 	emailFactor := false
-	canSkip := false
-	showSkip := false
+	skipFactor := false
 
 	if enrollResponse.HasStep(idx.EnrollmentStepSkip) {
-		canSkip = true
+		skipFactor = true
 	}
-	s.ViewData["skip"] = canSkip
+	s.ViewData["FactorSkip"] = skipFactor
 
 	if enrollResponse.HasStep(idx.EnrollmentStepPhoneVerification) {
 		phoneFactor = true
@@ -240,10 +240,10 @@ func (s *Server) enrollFactor(w http.ResponseWriter, r *http.Request) {
 	}
 	s.ViewData["FactorEmail"] = emailFactor
 
-	if enrollResponse.HasStep(idx.EnrollmentStepSkip) && (phoneFactor || emailFactor) {
-		showSkip = true
+	if !phoneFactor && !emailFactor {
+		s.transitionToProfile(enrollResponse, w, r)
+		return
 	}
-	s.ViewData["showSkipButton"] = showSkip
 
 	if errors, ok := s.cache.Get("Errors"); ok {
 		s.ViewData["Errors"] = errors
@@ -253,7 +253,43 @@ func (s *Server) enrollFactor(w http.ResponseWriter, r *http.Request) {
 	s.render("enroll.gohtml", w, r)
 }
 
+func (s *Server) transitionToProfile(er *idx.EnrollmentResponse, w http.ResponseWriter, r *http.Request) {
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+
+	enrollResponse, err := er.Skip(r.Context())
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+
+	if enrollResponse.Token() != nil {
+		session.Values["access_token"] = enrollResponse.Token().AccessToken
+		session.Values["id_token"] = enrollResponse.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+	}
+	http.Redirect(w, r, "/", http.StatusFound)
+	return
+}
+
 func (s *Server) handleEnrollFactor(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+
+	submit := r.FormValue("submit")
+	if submit == "skip" {
+		s.transitionToProfile(enrollResponse, w, r)
+		return
+	}
+
 	pushFactor := r.FormValue("push_factor")
 	if pushFactor == "push_email" {
 		http.Redirect(w, r, "/enrollEmail", http.StatusFound)
@@ -263,47 +299,9 @@ func (s *Server) handleEnrollFactor(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/enrollPhone", http.StatusFound)
 		return
 	}
-	cer, _ := s.cache.Get("enrollResponse")
-	enrollResponse := cer.(*idx.EnrollmentResponse)
-	// Get session store so we can store our tokens
-	session, err := sessionStore.Get(r, "direct-auth")
-	if err != nil {
-		log.Fatalf("could not get store: %s", err)
-	}
-	if enrollResponse.HasStep(idx.EnrollmentStepSkip) {
-		enrollResponse, err = enrollResponse.Skip(r.Context())
-		if err != nil {
-			session.Values["Errors"] = err.Error()
-			session.Save(r, w)
-			http.Redirect(w, r, "/register", http.StatusFound)
-			return
-		}
-		// If we have tokens we have success, so lets store tokens
-		if enrollResponse.Token() != nil {
-			session, err := sessionStore.Get(r, "direct-auth")
-			if err != nil {
-				log.Fatalf("could not get store: %s", err)
-			}
-			session.Values["access_token"] = enrollResponse.Token().AccessToken
-			session.Values["id_token"] = enrollResponse.Token().IDToken
-			err = session.Save(r, w)
-			if err != nil {
-				log.Fatalf("could not save access token: %s", err)
-			}
-			// redirect the user to /profile
-			http.Redirect(w, r, "/", http.StatusFound)
-			return
-		}
-		enrollResponse, err = enrollResponse.WhereAmI(r.Context())
-		if err != nil {
-			session.Values["Errors"] = err.Error()
-			session.Save(r, w)
-			http.Redirect(w, r, "/login", http.StatusFound)
-			return
-		}
-		s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
-		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
 
+	if enrollResponse.HasStep(idx.EnrollmentStepSkip) {
+		s.transitionToProfile(enrollResponse, w, r)
 	}
 	http.Redirect(w, r, "/enrollFactor", http.StatusFound)
 }
@@ -339,7 +337,6 @@ func (s *Server) handleEnrollPassword(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/enrollPassword", http.StatusFound)
 		return
 	}
-
 	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
 
 	if !enrollResponse.HasStep(idx.EnrollmentStepSuccess) {
@@ -686,6 +683,13 @@ func (s *Server) handlePasswordResetNewPassword(w http.ResponseWriter, r *http.R
 }
 
 func (s *Server) home(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionStore.Get(r, "direct-auth")
+	if session.Values["Errors"] != nil {
+		s.ViewData["Errors"] = session.Values["Errors"]
+		delete(session.Values, "Errors")
+		session.Save(r, w)
+	}
+
 	if s.IsAuthenticated(r) {
 		s.ViewData["Profile"] = s.getProfileData(r)
 	}
