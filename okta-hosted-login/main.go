@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -19,12 +21,19 @@ import (
 var (
 	tpl          *template.Template
 	sessionStore = sessions.NewCookieStore([]byte("okta-hosted-login-session-store"))
-	state        = "ApplicationState"
+	state        = generateState()
 	nonce        = "NonceNotSetYet"
 )
 
 func init() {
 	tpl = template.Must(template.ParseGlob("templates/*"))
+}
+
+func generateState() string {
+	// Generate a random byte array for state paramter
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
 func main() {
@@ -90,6 +99,11 @@ func AuthCodeCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	exchange := exchangeCode(r.URL.Query().Get("code"), r)
+	if exchange.Error != "" {
+		fmt.Println(exchange.Error)
+		fmt.Println(exchange.ErrorDescription)
+		return
+	}
 
 	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
 	if err != nil {
@@ -145,7 +159,6 @@ func exchangeCode(code string, r *http.Request) Exchange {
 
 	q := r.URL.Query()
 	q.Add("grant_type", "authorization_code")
-	q.Add("code", code)
 	q.Add("redirect_uri", "http://localhost:8080/authorization-code/callback")
 
 	url := os.Getenv("ISSUER") + "/v1/token?" + q.Encode()
