@@ -61,15 +61,16 @@ type PKCE struct {
 }
 
 type Server struct {
-	config       *config.Config
-	tpl          *template.Template
-	sessionStore *sessions.CookieStore
-	ViewData     ViewData
-	cache        *cache.Cache
-	svc          *http.Server
-	address      string
-	pkce         *PKCE
-	state        string
+	config            *config.Config
+	tpl               *template.Template
+	sessionStore      *sessions.CookieStore
+	ViewData          ViewData
+	cache             *cache.Cache
+	svc               *http.Server
+	address           string
+	pkce              *PKCE
+	state             string
+	interactionHandle string
 }
 
 type ViewData map[string]interface{}
@@ -181,6 +182,7 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	interactionHandle, err := s.getInteractionHandle(s.pkce.CodeChallenge)
+	s.interactionHandle = interactionHandle
 	if err != nil {
 		fmt.Printf("could not get interactionHandle: %s\n", err.Error())
 	}
@@ -214,6 +216,46 @@ func (s *Server) LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "The state was not as expected")
 		return
 	}
+
+	// Check if interaction_required error is returned
+	if r.URL.Query().Get("error") == "interaction_required" {
+		w.Header().Add("Cache-Control", "no-cache")
+
+		// render the widget with the saved interaction handle
+		type customData struct {
+			IsAuthenticated   bool
+			BaseUrl           string
+			ClientId          string
+			Issuer            string
+			State             string
+			InteractionHandle string
+			Pkce              *PKCE
+		}
+
+		issuerURL := fmt.Sprintf("%s/", s.config.Okta.IDX.Issuer)
+		issuerParts, err := url.Parse(issuerURL)
+		if err != nil {
+			fmt.Printf("error: %s\n", err.Error())
+			os.Exit(1)
+		}
+		baseUrl := issuerParts.Scheme + "://" + issuerParts.Hostname()
+
+		data := customData{
+			IsAuthenticated:   s.isAuthenticated(r),
+			BaseUrl:           baseUrl,
+			ClientId:          s.config.Okta.IDX.ClientID,
+			Issuer:            s.config.Okta.IDX.Issuer,
+			State:             s.state,
+			Pkce:              s.pkce,
+			InteractionHandle: s.interactionHandle,
+		}
+		err = s.tpl.ExecuteTemplate(w, "login.gohtml", data)
+		if err != nil {
+			fmt.Printf("error: %s\n", err.Error())
+		}
+		return
+	}
+
 	// Make sure the interaction_code was provided
 	if r.URL.Query().Get("interaction_code") == "" {
 		fmt.Fprintln(w, "The interaction_code was not returned or is not accessible")
