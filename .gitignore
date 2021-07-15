@@ -4,3 +4,4 @@ okta-oidc-tck
 node_modules
 testenv
 .idea
+.vscode

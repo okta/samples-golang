@@ -19,7 +19,8 @@
                     {{if .InitialPhoneSetup}}
                       <div>
                         <label for="phoneNumber" class="block text-sm font-medium text-gray-700">
-                          Enter your phone number:
+                          Enter your phone number in format: (+) {country code} {area code} {number}
+                          <br> For e.g. +1 555 666 7777
                         </label>
                         <div class="mt-1">
                           <input id="phoneNumber" name="phoneNumber" type="text" required class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
@@ -32,15 +33,15 @@
                         <p class="text-sm text-gray-500">Please choose the method for this factor</p>
                         <div class="mt-4 space-y-4">
                           <div class="flex items-center">
-                            <input id="voice" name="phoneMethod" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" checked>
-                            <label for="voice" class="ml-3 block text-sm font-medium text-gray-700">
-                              Voice
+                            <input id="sms" name="phoneMethod" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" checked>
+                            <label for="sms" class="ml-3 block text-sm font-medium text-gray-700">
+                              SMS
                             </label>
                           </div>
                           <div class="flex items-center">
-                            <input id="sms" name="phoneMethod" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
-                            <label for="sms" class="ml-3 block text-sm font-medium text-gray-700">
-                              SMS
+                            <input id="voice" name="phoneMethod" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
+                            <label for="voice" class="ml-3 block text-sm font-medium text-gray-700">
+                              Voice
                             </label>
                           </div>
                         </div>
