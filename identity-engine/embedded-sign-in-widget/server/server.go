@@ -21,6 +21,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -76,6 +77,10 @@ type Server struct {
 type ViewData map[string]interface{}
 
 func NewServer(c *config.Config) *Server {
+	// Generate random byte array for state parameter
+	b := make([]byte, 16)
+	rand.Read(b)
+
 	return &Server{
 		config: c,
 		tpl:    template.Must(template.ParseGlob("templates/*.gohtml")),
@@ -86,7 +91,7 @@ func NewServer(c *config.Config) *Server {
 			"Authenticated": false,
 			"Errors":        "",
 		},
-		state: "ApplicationState",
+		state: hex.EncodeToString(b),
 	}
 }
 
