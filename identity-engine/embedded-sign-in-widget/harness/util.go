@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	ROOT_VIEW_H1 = "Self Hosted Widget + Golang Example"
+	ROOT_VIEW_H1 = "Embedded Sign-in Widget + Golang Example"
 )
 
 func defaultTimeout() time.Duration {
