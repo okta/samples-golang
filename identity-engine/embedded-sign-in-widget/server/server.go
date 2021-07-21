@@ -84,7 +84,7 @@ func NewServer(c *config.Config) *Server {
 	return &Server{
 		config: c,
 		tpl:    template.Must(template.ParseGlob("templates/*.gohtml")),
-		//idxClient: idx,
+		// idxClient: idx,
 		sessionStore: sessions.NewCookieStore([]byte("randomKey")),
 		cache:        cache.New(5*time.Minute, 10*time.Minute),
 		ViewData: map[string]interface{}{
@@ -365,7 +365,6 @@ func (s *Server) verifyToken(t string) (*verifier.Jwt, error) {
 	}
 
 	result, err := jv.New().VerifyIdToken(t)
-
 	if err != nil {
 		return nil, fmt.Errorf("%s; token: %s", err, t)
 	}
@@ -459,7 +458,6 @@ func createPKCEData() (*PKCE, error) {
 		CodeVerifier:        *codeVerifier,
 		CodeChallengeMethod: "S256",
 	}, nil
-
 }
 
 // Generate a Nonce to be used during the initialization of the SIW

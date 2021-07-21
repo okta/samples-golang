@@ -201,6 +201,8 @@ github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLA
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
 github.com/okta/okta-idx-golang v0.0.0-20210624162636-dca80a2d6699 h1:ipbV71OtOIG9dq0RSQJhrstM83lAXdDKmWz0AVZTcSE=
 github.com/okta/okta-idx-golang v0.0.0-20210624162636-dca80a2d6699/go.mod h1:h+cnPj4zH6JpdNv2+llAvTKNA3UL8ySofhJ9QVT6xoc=
+github.com/okta/okta-idx-golang v0.0.0-20210721200626-788caa57c6c8 h1:RRjDiHMBucxTa6oTHiUrxgom2jTOY8u4zDFv2fCQ8k8=
+github.com/okta/okta-idx-golang v0.0.0-20210721200626-788caa57c6c8/go.mod h1:h+cnPj4zH6JpdNv2+llAvTKNA3UL8ySofhJ9QVT6xoc=
 github.com/okta/okta-jwt-verifier-golang v1.1.1 h1:yL4uSwtVQ6L3m2Pq8tcVUbb8e/SZ7p/r6eduqq1YjBM=
 github.com/okta/okta-jwt-verifier-golang v1.1.1/go.mod h1:Nw85EhrNXkWgfkhE9lggRoRVZLVm7zf/ZtglDUzkKU8=
 github.com/okta/okta-sdk-golang/v2 v2.3.1-0.20210519105407-20ace51aad26 h1:GslfCBAaOiuJ04Vm/3SFptoLZm0nzdOO6DYuWGnteK4=

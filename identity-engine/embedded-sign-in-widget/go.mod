@@ -7,7 +7,6 @@ require (
 	github.com/cucumber/messages-go/v10 v10.0.3
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/sessions v1.2.1
-	github.com/okta/okta-idx-golang v0.0.0-20210624162636-dca80a2d6699 // indirect
 	github.com/okta/okta-jwt-verifier-golang v1.1.1
 	github.com/okta/okta-sdk-golang/v2 v2.3.1-0.20210519105407-20ace51aad26
 	github.com/patrickmn/go-cache v0.0.0-20180815053127-5633e0862627
