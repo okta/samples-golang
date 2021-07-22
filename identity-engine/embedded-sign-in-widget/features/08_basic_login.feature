@@ -1,4 +1,4 @@
-@8
+@8 @no-ci
 Feature: Basic Login with Embedded Sign In Widget
 
   Background:
