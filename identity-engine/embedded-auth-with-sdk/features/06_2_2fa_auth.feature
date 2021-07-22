@@ -66,7 +66,7 @@ Feature: 6.2 Multi-Factor Authentication with Password and SMS
     When she selects Phone from the list
     Then she sees form with method and phone number
     When she inputs a method and invalid phone number
-    Then she sees a message "Unable to initiate factor enrollment: Invalid Phone Number."
+    Then she sees a message "Invalid Phone Number."
 
   @6.2.4
   Scenario: 6.2.4 2FA Mary enters a wrong verification code on verify

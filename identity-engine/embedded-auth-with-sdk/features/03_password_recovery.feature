@@ -23,4 +23,4 @@ Feature: 3.1 Direct Auth Password Recovery
     Given Mary navigates to the Password Recovery View
     When she inputs incorrect Email
     And she submits the recovery form
-    Then she sees a message "There is no account with the Username"
+    Then she sees a message "Reset password is not allowed at this time. Please contact support for assistance."

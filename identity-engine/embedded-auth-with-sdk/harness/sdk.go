@@ -175,6 +175,14 @@ func (th *TestHarness) resetAppSignOnPolicyRule() error {
 		return err
 	}
 	_, err = th.oktaClient.GetRequestExecutor().Do(context.Background(), req, nil)
+	if err != nil {
+		return err
+	}
+	req, err = th.oktaClient.GetRequestExecutor().NewRequest(http.MethodPost, fmt.Sprintf("/api/v1/policies/%s/rules/%s/lifecycle/deactivate", th.org.policyID, th.org.mfaRuleID), nil)
+	if err != nil {
+		return err
+	}
+	_, err = th.oktaClient.GetRequestExecutor().Do(context.Background(), req, nil)
 	return err
 }
 
@@ -280,6 +288,14 @@ func (th *TestHarness) singOnPolicyRuleGroup() error {
 		}
 	}
 	req, err = th.oktaClient.GetRequestExecutor().NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.policyID, th.org.mfaRuleID), &rule)
+	if err != nil {
+		return err
+	}
+	_, err = th.oktaClient.GetRequestExecutor().Do(context.Background(), req, nil)
+	if err != nil {
+		return err
+	}
+	req, err = th.oktaClient.GetRequestExecutor().NewRequest(http.MethodPost, fmt.Sprintf("/api/v1/policies/%s/rules/%s/lifecycle/activate", th.org.policyID, th.org.mfaRuleID), nil)
 	if err != nil {
 		return err
 	}

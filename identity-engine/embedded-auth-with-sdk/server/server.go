@@ -285,7 +285,7 @@ func (s *Server) handleEnrollFactor(w http.ResponseWriter, r *http.Request) {
 	enrollResponse := cer.(*idx.EnrollmentResponse)
 
 	submit := r.FormValue("submit")
-	if submit == "skip" {
+	if submit == "Skip" {
 		s.transitionToProfile(enrollResponse, w, r)
 		return
 	}
