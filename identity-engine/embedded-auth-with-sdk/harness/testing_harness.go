@@ -303,6 +303,7 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 
 	ctx.Step(`sees form with method and phone number$`, th.seesPhoneWithMethod)
 	ctx.Step(`sees form with method$`, th.seesMethod)
+	ctx.Step(`inputs a method$`, th.submitsMethod)
 	ctx.Step(`inputs a method and valid phone number$`, th.submitsPhoneWithMethod)
 	ctx.Step(`inputs a method and invalid phone number$`, th.submitsInvalidPhoneWithMethod)
 

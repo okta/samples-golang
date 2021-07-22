@@ -10,7 +10,7 @@ Feature: 1.1 Basic Login with Password Factor
     When she fills in her incorrect username
     And she fills in her password
     And she submits the Login form
-    Then she should see an error message on the Login form "There is no account with the Username xxx".
+    Then she should see an error message on the Login form "Authentication failed".
 
   @1.1.3
   Scenario: 1.1.3 Mary doesn't know her password
