@@ -149,6 +149,14 @@ func (s *Server) Run() {
 
 		http.Redirect(w, r, "/", http.StatusFound)
 	}).Methods("POST")
+	r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
+		// allow GET when not logged in since it is a flow listed in the possilies on the index page
+		if session, err := sessionStore.Get(r, "direct-auth"); err == nil {
+			session.Values["Errors"] = "Not signed in."
+			session.Save(r, w)
+		}
+		http.Redirect(w, r, "/", http.StatusFound)
+	}).Methods("GET")
 	r.HandleFunc("/profile", func(w http.ResponseWriter, r *http.Request) {
 		s.ViewData["Profile"] = s.getProfileData(r)
 		s.render("profile.gohtml", w, r)
