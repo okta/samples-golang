@@ -3,8 +3,10 @@ package server
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -32,6 +34,39 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 
 	// Render the login page
 	s.render("login.gohtml", w, r)
+}
+
+// logout revokes the oauth2 token server side
+func (s *Server) logout(r *http.Request) {
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil || session.Values["access_token"] == nil || session.Values["access_token"] == "" {
+		return
+	}
+
+	var revokeTokenUrl string
+	if strings.Contains(s.config.Okta.IDX.Issuer, "oauth2") {
+		revokeTokenUrl = s.config.Okta.IDX.Issuer + "/v1/revoke"
+	} else {
+		revokeTokenUrl = s.config.Okta.IDX.Issuer + "/oauth2/v1/revoke"
+	}
+
+	form := url.Values{}
+	form.Set("token", session.Values["access_token"].(string))
+	form.Set("token_type_hint", "access_token")
+	form.Set("client_id", s.config.Okta.IDX.ClientID)
+	form.Set("client_secret", s.config.Okta.IDX.ClientSecret)
+	req, _ := http.NewRequest("POST", revokeTokenUrl, strings.NewReader(form.Encode()))
+	h := req.Header
+	h.Add("Accept", "application/json")
+	h.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		body, _ := ioutil.ReadAll(resp.Body)
+		fmt.Printf("revoke error; status: %s, body: %s\n", resp.Status, string(body))
+	}
+	defer resp.Body.Close()
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {

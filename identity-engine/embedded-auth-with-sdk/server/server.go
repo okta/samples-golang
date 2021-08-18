@@ -139,12 +139,12 @@ func (s *Server) Run() {
 	r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
 		session, err := sessionStore.Get(r, "direct-auth")
 		if err == nil {
+			s.logout(r)
 			delete(session.Values, "id_token")
 			delete(session.Values, "access_token")
 			delete(session.Values, "Errors")
 			session.Save(r, w)
 		}
-
 		s.cache.Flush()
 
 		http.Redirect(w, r, "/", http.StatusFound)
