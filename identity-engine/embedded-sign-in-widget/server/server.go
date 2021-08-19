@@ -300,7 +300,7 @@ func (s *Server) LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	req, _ := http.NewRequest("POST", url, bytes.NewReader([]byte("")))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: time.Second * 30}
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Fatalf("RESP ERROR: %+v\n", err.Error())
@@ -363,7 +363,7 @@ func (s *Server) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 			h.Add("Accept", "application/json")
 			h.Add("Content-Type", "application/x-www-form-urlencoded")
 
-			client := &http.Client{}
+	        client := &http.Client{Timeout: time.Second * 30}
 			resp, err := client.Do(req)
 			if err != nil {
 				body, _ := ioutil.ReadAll(resp.Body)
@@ -431,7 +431,7 @@ func (s *Server) getProfileData(r *http.Request) map[string]string {
 	h.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	h.Add("Accept", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: time.Second * 30}
 	resp, _ := client.Do(req)
 	body, _ := ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
@@ -524,7 +524,7 @@ func (s *Server) getInteractionHandle(codeChallenge string) (string, error) {
 		return "", fmt.Errorf("failed to create interact http request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	client := &http.Client{}
+	client := &http.Client{Timeout: time.Second * 30}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("http call has failed: %w", err)

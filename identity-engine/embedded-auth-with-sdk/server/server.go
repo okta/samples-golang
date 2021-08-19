@@ -798,7 +798,7 @@ func (s *Server) getProfileData(r *http.Request) map[string]string {
 	h.Add("Authorization", "Bearer "+session.Values["access_token"].(string))
 	h.Add("Accept", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: time.Second * 30}
 	resp, _ := client.Do(req)
 	body, _ := ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()

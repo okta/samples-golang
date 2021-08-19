@@ -60,7 +60,7 @@ func (s *Server) logout(r *http.Request) {
 	h.Add("Accept", "application/json")
 	h.Add("Content-Type", "application/x-www-form-urlencoded")
 
-	client := &http.Client{}
+    client := &http.Client{Timeout: time.Second * 30}
 	resp, err := client.Do(req)
 	if err != nil {
 		body, _ := ioutil.ReadAll(resp.Body)
