@@ -300,7 +300,7 @@ func (s *Server) LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	req, _ := http.NewRequest("POST", url, bytes.NewReader([]byte("")))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: time.Second * 30}
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Fatalf("RESP ERROR: %+v\n", err.Error())
@@ -343,6 +343,36 @@ func (s *Server) ProfileHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	// revoke the oauth2 access token it exists in the session API side before flushing cache
+	if session, err := s.sessionStore.Get(r, SESSION_STORE_NAME); err != nil {
+		if accessToken, found := s.cache.Get(fmt.Sprintf("%s-access_token", session.ID)); found {
+			var revokeTokenUrl string
+			if strings.Contains(s.config.Okta.IDX.Issuer, "oauth2") {
+				revokeTokenUrl = s.config.Okta.IDX.Issuer + "/v1/revoke"
+			} else {
+				revokeTokenUrl = s.config.Okta.IDX.Issuer + "/oauth2/v1/revoke"
+			}
+
+			form := url.Values{}
+			form.Set("token", accessToken.(string))
+			form.Set("token_type_hint", "access_token")
+			form.Set("client_id", s.config.Okta.IDX.ClientID)
+			form.Set("client_secret", s.config.Okta.IDX.ClientSecret)
+			req, _ := http.NewRequest("POST", revokeTokenUrl, strings.NewReader(form.Encode()))
+			h := req.Header
+			h.Add("Accept", "application/json")
+			h.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	        client := &http.Client{Timeout: time.Second * 30}
+			resp, err := client.Do(req)
+			if err != nil {
+				body, _ := ioutil.ReadAll(resp.Body)
+				fmt.Printf("revoke error; status: %s, body: %s\n", resp.Status, string(body))
+			}
+			defer resp.Body.Close()
+		}
+	}
+
 	s.cache.Flush()
 	http.Redirect(w, r, "/", http.StatusFound)
 }
@@ -401,7 +431,7 @@ func (s *Server) getProfileData(r *http.Request) map[string]string {
 	h.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	h.Add("Accept", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: time.Second * 30}
 	resp, _ := client.Do(req)
 	body, _ := ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
@@ -494,7 +524,7 @@ func (s *Server) getInteractionHandle(codeChallenge string) (string, error) {
 		return "", fmt.Errorf("failed to create interact http request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	client := &http.Client{}
+	client := &http.Client{Timeout: time.Second * 30}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("http call has failed: %w", err)

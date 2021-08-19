@@ -104,7 +104,7 @@ type orgData struct {
 
 func NewTestHarness() *TestHarness {
 	return &TestHarness{
-		httpClient: &http.Client{Timeout: time.Second * 60},
+		httpClient: &http.Client{Timeout: time.Second * 30},
 	}
 }
 

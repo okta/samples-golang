@@ -139,12 +139,12 @@ func (s *Server) Run() {
 	r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
 		session, err := sessionStore.Get(r, "direct-auth")
 		if err == nil {
+			s.logout(r)
 			delete(session.Values, "id_token")
 			delete(session.Values, "access_token")
 			delete(session.Values, "Errors")
 			session.Save(r, w)
 		}
-
 		s.cache.Flush()
 
 		http.Redirect(w, r, "/", http.StatusFound)
@@ -798,7 +798,7 @@ func (s *Server) getProfileData(r *http.Request) map[string]string {
 	h.Add("Authorization", "Bearer "+session.Values["access_token"].(string))
 	h.Add("Accept", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: time.Second * 30}
 	resp, _ := client.Do(req)
 	body, _ := ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
