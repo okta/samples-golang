@@ -17,33 +17,13 @@
 package main
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/config"
 	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/server"
 )
 
-type application struct {
-	Config *config.Config
-	Server *server.Server
-}
-
-var App *application
-
 func main() {
-	App = &application{}
 	cfg := &config.Config{}
-	err := config.ReadConfig(cfg)
-	if err != nil {
-		fmt.Printf("%+v\n", err)
-		os.Exit(1)
-	}
-
 	server := server.NewServer(cfg)
-
-	App.Config = cfg
-	App.Server = server
 
 	server.Run()
 }

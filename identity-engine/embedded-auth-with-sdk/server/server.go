@@ -703,7 +703,7 @@ func (s *Server) parseTemplates() {
 	var err error
 	t := template.New("")
 
-	s.view = views.NewView(s.config, sessionStore)
+	s.view = views.NewView(s.idxClient, sessionStore)
 
 	s.tpl, err = t.Funcs(s.view.TemplateFuncs()).ParseGlob("views/*.gohtml")
 
@@ -782,10 +782,11 @@ func (s *Server) getProfileData(r *http.Request) map[string]string {
 	}
 
 	var reqUrl string
-	if strings.Contains(s.config.Okta.IDX.Issuer, "oauth2") {
-		reqUrl = s.config.Okta.IDX.Issuer + "/v1/userinfo"
+	issuer := s.idxClient.Config().Okta.IDX.Issuer
+	if strings.Contains(issuer, "oauth2") {
+		reqUrl = issuer + "/v1/userinfo"
 	} else {
-		reqUrl = s.config.Okta.IDX.Issuer + "/oauth2/v1/userinfo"
+		reqUrl = issuer + "/oauth2/v1/userinfo"
 	}
 
 	req, _ := http.NewRequest("GET", reqUrl, bytes.NewReader([]byte("")))

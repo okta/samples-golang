@@ -44,23 +44,24 @@ func (s *Server) logout(r *http.Request) {
 	}
 
 	var revokeTokenUrl string
-	if strings.Contains(s.config.Okta.IDX.Issuer, "oauth2") {
-		revokeTokenUrl = s.config.Okta.IDX.Issuer + "/v1/revoke"
+	issuer := s.idxClient.Config().Okta.IDX.Issuer
+	if strings.Contains(issuer, "oauth2") {
+		revokeTokenUrl = issuer + "/v1/revoke"
 	} else {
-		revokeTokenUrl = s.config.Okta.IDX.Issuer + "/oauth2/v1/revoke"
+		revokeTokenUrl = issuer + "/oauth2/v1/revoke"
 	}
 
 	form := url.Values{}
 	form.Set("token", session.Values["access_token"].(string))
 	form.Set("token_type_hint", "access_token")
-	form.Set("client_id", s.config.Okta.IDX.ClientID)
-	form.Set("client_secret", s.config.Okta.IDX.ClientSecret)
+	form.Set("client_id", s.idxClient.Config().Okta.IDX.ClientID)
+	form.Set("client_secret", s.idxClient.Config().Okta.IDX.ClientSecret)
 	req, _ := http.NewRequest("POST", revokeTokenUrl, strings.NewReader(form.Encode()))
 	h := req.Header
 	h.Add("Accept", "application/json")
 	h.Add("Content-Type", "application/x-www-form-urlencoded")
 
-    client := &http.Client{Timeout: time.Second * 30}
+	client := &http.Client{Timeout: time.Second * 30}
 	resp, err := client.Do(req)
 	if err != nil {
 		body, _ := ioutil.ReadAll(resp.Body)
