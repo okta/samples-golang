@@ -23,7 +23,6 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -114,18 +113,8 @@ func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 		cfg := &config.Config{
 			Testing: true,
 		}
-		err := config.ReadConfig(cfg)
-		if err != nil {
-			log.Fatalf("read config error: %+v", err)
-		}
-		orgUrl, err := url.Parse(cfg.Okta.IDX.Issuer)
-		if err != nil {
-			log.Fatalf("url parse error: %+v", err)
-		}
 		_, client, err := okta.NewClient(
 			context.Background(),
-			okta.WithOrgUrl(fmt.Sprintf("https://%s", orgUrl.Host)),
-			okta.WithToken(os.Getenv("OKTA_CLIENT_TOKEN")),
 			okta.WithHttpClientPtr(th.httpClient),
 		)
 		if err != nil {

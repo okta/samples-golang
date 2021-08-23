@@ -57,12 +57,7 @@ type ViewData map[string]interface{}
 var sessionStore = sessions.NewCookieStore([]byte("okta-direct-auth-session-store"))
 
 func NewServer(c *config.Config) *Server {
-	idx, err := idx.NewClient(
-		idx.WithClientID(c.Okta.IDX.ClientID),
-		idx.WithClientSecret(c.Okta.IDX.ClientSecret),
-		idx.WithIssuer(c.Okta.IDX.Issuer),
-		idx.WithScopes(c.Okta.IDX.Scopes),
-		idx.WithRedirectURI(c.Okta.IDX.RedirectURI))
+	idx, err := idx.NewClient()
 	if err != nil {
 		log.Fatalf("new client error: %+v", err)
 	}
