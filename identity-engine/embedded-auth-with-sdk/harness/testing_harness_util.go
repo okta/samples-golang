@@ -71,16 +71,19 @@ func claimItem(key string) string {
 }
 
 func randomString() string {
+	// Password requirements: at least 8 characters, a lowercase letter, an uppercase letter, a number, no parts of your username
 	digits := "0123456789"
-	specials := "~=+%^*/()[]{}/!@#$?|"
+	lowers := "abcdefghijklmnopqrstuvwxyz"
+	uppers := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	all := "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
 		"abcdefghijklmnopqrstuvwxyz" +
-		digits + specials
+		digits
 	length := 12
 	buf := make([]byte, length)
 	buf[0] = digits[rand.Intn(len(digits))]
-	buf[1] = specials[rand.Intn(len(specials))]
-	for i := 2; i < length; i++ {
+	buf[1] = lowers[rand.Intn(len(lowers))]
+	buf[2] = uppers[rand.Intn(len(uppers))]
+	for i := 3; i < length; i++ {
 		buf[i] = all[rand.Intn(len(all))]
 	}
 	rand.Shuffle(len(buf), func(i, j int) {
