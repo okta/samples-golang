@@ -62,6 +62,14 @@ func NewServer(c *config.Config) *Server {
 		log.Fatalf("new client error: %+v", err)
 	}
 
+	// NOTE: The cucumber testing harness Okta uses to ensure the golang samples
+	// remain operational needs to be throttled so it doesn't get rate limited
+	// by too many concurrent requests in tests. The idx client allows the
+	// ability to set a custom http client and we make use of that feature here.
+	if c.HttpClient != nil {
+		idx = idx.WithHTTPClient(c.HttpClient)
+	}
+
 	return &Server{
 		config:    c,
 		idxClient: idx,

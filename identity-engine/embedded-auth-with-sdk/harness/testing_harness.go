@@ -110,8 +110,11 @@ func NewTestHarness() *TestHarness {
 func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 	rand.Seed(time.Now().UnixNano())
 	ctx.BeforeSuite(func() {
+		httpClient := &http.Client{Timeout: time.Second * 30}
+		httpClient.Transport = &testThrottledTransport{}
 		cfg := &config.Config{
-			Testing: true,
+			Testing:    true,
+			HttpClient: httpClient,
 		}
 		_, client, err := okta.NewClient(
 			context.Background(),
@@ -132,6 +135,16 @@ func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 
 	ctx.AfterSuite(func() {
 	})
+}
+
+type testThrottledTransport struct{}
+
+func (t *testThrottledTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Rapid concurrent connections that can be exhibited in an automated test
+	// harness can get rate limited.
+	// https://developer.okta.com/docs/reference/rl-additional-limits/
+	time.Sleep(time.Millisecond * 75)
+	return http.DefaultTransport.RoundTrip(req)
 }
 
 func (th *TestHarness) depopulateMary() {

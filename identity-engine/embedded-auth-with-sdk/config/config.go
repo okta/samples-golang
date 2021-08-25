@@ -16,6 +16,9 @@
 
 package config
 
+import "net/http"
+
 type Config struct {
-	Testing bool
+	Testing    bool
+	HttpClient *http.Client
 }
