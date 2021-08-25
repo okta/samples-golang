@@ -23,7 +23,6 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -111,21 +110,14 @@ func NewTestHarness() *TestHarness {
 func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 	rand.Seed(time.Now().UnixNano())
 	ctx.BeforeSuite(func() {
+		httpClient := &http.Client{Timeout: time.Second * 30}
+		httpClient.Transport = &testThrottledTransport{}
 		cfg := &config.Config{
-			Testing: true,
-		}
-		err := config.ReadConfig(cfg)
-		if err != nil {
-			log.Fatalf("read config error: %+v", err)
-		}
-		orgUrl, err := url.Parse(cfg.Okta.IDX.Issuer)
-		if err != nil {
-			log.Fatalf("url parse error: %+v", err)
+			Testing:    true,
+			HttpClient: httpClient,
 		}
 		_, client, err := okta.NewClient(
 			context.Background(),
-			okta.WithOrgUrl(fmt.Sprintf("https://%s", orgUrl.Host)),
-			okta.WithToken(os.Getenv("OKTA_CLIENT_TOKEN")),
 			okta.WithHttpClientPtr(th.httpClient),
 		)
 		if err != nil {
@@ -143,6 +135,16 @@ func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 
 	ctx.AfterSuite(func() {
 	})
+}
+
+type testThrottledTransport struct{}
+
+func (t *testThrottledTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Rapid concurrent connections that can be exhibited in an automated test
+	// harness can get rate limited.
+	// https://developer.okta.com/docs/reference/rl-additional-limits/
+	time.Sleep(time.Millisecond * 75)
+	return http.DefaultTransport.RoundTrip(req)
 }
 
 func (th *TestHarness) depopulateMary() {

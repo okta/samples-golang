@@ -18,36 +18,30 @@ package views
 
 import (
 	"html/template"
-	"net/http"
 	"reflect"
 	"strings"
 
 	"github.com/gorilla/sessions"
 
-	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/config"
+	idx "github.com/okta/okta-idx-golang"
 )
 
 var (
-	tpl *template.Template
-	cfg *config.Config
+	idxClient *idx.Client
 )
 
 type ViewConfig struct {
-	config      *config.Config
-	session     *sessions.CookieStore
-	currRequest *http.Request
+	session *sessions.CookieStore
 }
 
-func NewView(c *config.Config, s *sessions.CookieStore) *ViewConfig {
+func NewView(c *idx.Client, s *sessions.CookieStore) *ViewConfig {
+	idxClient = c
 	return &ViewConfig{
-		config:  c,
 		session: s,
 	}
 }
 
 func (vc *ViewConfig) TemplateFuncs() template.FuncMap {
-	cfg = vc.config
-
 	return template.FuncMap{
 		"configOption": configOption,
 	}
@@ -55,14 +49,15 @@ func (vc *ViewConfig) TemplateFuncs() template.FuncMap {
 
 func configOption(item string) string {
 	if item == "Scopes" {
-		return strings.Join(cfg.Okta.IDX.Scopes, ", ")
+		return strings.Join(idxClient.Config().Okta.IDX.Scopes, ", ")
 	}
 
 	if item == "ClientSecret" {
-		return "****" + string(cfg.Okta.IDX.ClientSecret[len(cfg.Okta.IDX.ClientSecret)-7:])
+		secret := idxClient.Config().Okta.IDX.ClientSecret
+		return "****" + string(secret[len(secret)-7:])
 	}
 
-	r := reflect.ValueOf(cfg.Okta.IDX)
+	r := reflect.ValueOf(idxClient.Config().Okta.IDX)
 	f := reflect.Indirect(r).FieldByName(item)
 	return string(f.String())
 }

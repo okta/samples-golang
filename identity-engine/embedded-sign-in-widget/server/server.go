@@ -35,6 +35,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
+	idx "github.com/okta/okta-idx-golang"
 	verifier "github.com/okta/okta-jwt-verifier-golang"
 	"github.com/patrickmn/go-cache"
 
@@ -63,6 +64,7 @@ type PKCE struct {
 
 type Server struct {
 	config            *config.Config
+	idxClient         *idx.Client
 	tpl               *template.Template
 	sessionStore      *sessions.CookieStore
 	ViewData          ViewData
@@ -77,14 +79,19 @@ type Server struct {
 type ViewData map[string]interface{}
 
 func NewServer(c *config.Config) *Server {
+	idx, err := idx.NewClient()
+	if err != nil {
+		log.Fatalf("new client error: %+v", err)
+	}
+
 	// Generate random byte array for state parameter
 	b := make([]byte, 16)
 	rand.Read(b)
 
 	return &Server{
-		config: c,
-		tpl:    template.Must(template.ParseGlob("templates/*.gohtml")),
-		// idxClient: idx,
+		config:       c,
+		tpl:          template.Must(template.ParseGlob("templates/*.gohtml")),
+		idxClient:    idx,
 		sessionStore: sessions.NewCookieStore([]byte("randomKey")),
 		cache:        cache.New(5*time.Minute, 10*time.Minute),
 		ViewData: map[string]interface{}{
@@ -191,7 +198,8 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Printf("could not get interactionHandle: %s\n", err.Error())
 	}
-	issuerURL := fmt.Sprintf("%s/", s.config.Okta.IDX.Issuer)
+
+	issuerURL := s.idxClient.Config().Okta.IDX.Issuer
 	issuerParts, err := url.Parse(issuerURL)
 	if err != nil {
 		fmt.Printf("error: %s\n", err.Error())
@@ -202,8 +210,8 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	data := customData{
 		IsAuthenticated:   s.isAuthenticated(r),
 		BaseUrl:           baseUrl,
-		ClientId:          s.config.Okta.IDX.ClientID,
-		Issuer:            s.config.Okta.IDX.Issuer,
+		ClientId:          s.idxClient.Config().Okta.IDX.ClientID,
+		Issuer:            s.idxClient.Config().Okta.IDX.Issuer,
 		State:             s.state,
 		Nonce:             nonce,
 		Pkce:              s.pkce,
@@ -237,7 +245,7 @@ func (s *Server) LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 			Pkce              *PKCE
 		}
 
-		issuerURL := fmt.Sprintf("%s/", s.config.Okta.IDX.Issuer)
+		issuerURL := s.idxClient.Config().Okta.IDX.Issuer
 		issuerParts, err := url.Parse(issuerURL)
 		if err != nil {
 			fmt.Printf("error: %s\n", err.Error())
@@ -248,8 +256,8 @@ func (s *Server) LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		data := customData{
 			IsAuthenticated:   s.isAuthenticated(r),
 			BaseUrl:           baseUrl,
-			ClientId:          s.config.Okta.IDX.ClientID,
-			Issuer:            s.config.Okta.IDX.Issuer,
+			ClientId:          s.idxClient.Config().Okta.IDX.ClientID,
+			Issuer:            s.idxClient.Config().Okta.IDX.Issuer,
 			State:             s.state,
 			Pkce:              s.pkce,
 			InteractionHandle: s.interactionHandle,
@@ -286,17 +294,11 @@ func (s *Server) LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 
 	q.Add("grant_type", "interaction_code")
 	q.Set("interaction_code", r.URL.Query().Get("interaction_code"))
-	q.Add("client_id", s.config.Okta.IDX.ClientID)
-	q.Add("client_secret", s.config.Okta.IDX.ClientSecret)
+	q.Add("client_id", s.idxClient.Config().Okta.IDX.ClientID)
+	q.Add("client_secret", s.idxClient.Config().Okta.IDX.ClientSecret)
 	q.Add("code_verifier", session.Values["pkce_code_verifier"].(string))
 
-	var url string
-	if strings.Contains(s.config.Okta.IDX.Issuer, "oauth2") {
-		url = s.config.Okta.IDX.Issuer + "/v1/token?" + q.Encode()
-	} else {
-		url = s.config.Okta.IDX.Issuer + "/oauth2/v1/token?" + q.Encode()
-	}
-
+	url := s.oAuthEndPoint(fmt.Sprintf("token?%s", q.Encode()))
 	req, _ := http.NewRequest("POST", url, bytes.NewReader([]byte("")))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
@@ -346,24 +348,18 @@ func (s *Server) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	// revoke the oauth2 access token it exists in the session API side before flushing cache
 	if session, err := s.sessionStore.Get(r, SESSION_STORE_NAME); err != nil {
 		if accessToken, found := s.cache.Get(fmt.Sprintf("%s-access_token", session.ID)); found {
-			var revokeTokenUrl string
-			if strings.Contains(s.config.Okta.IDX.Issuer, "oauth2") {
-				revokeTokenUrl = s.config.Okta.IDX.Issuer + "/v1/revoke"
-			} else {
-				revokeTokenUrl = s.config.Okta.IDX.Issuer + "/oauth2/v1/revoke"
-			}
-
+			revokeTokenUrl := s.oAuthEndPoint("revoke")
 			form := url.Values{}
 			form.Set("token", accessToken.(string))
 			form.Set("token_type_hint", "access_token")
-			form.Set("client_id", s.config.Okta.IDX.ClientID)
-			form.Set("client_secret", s.config.Okta.IDX.ClientSecret)
+			form.Add("client_id", s.idxClient.Config().Okta.IDX.ClientID)
+			form.Add("client_secret", s.idxClient.Config().Okta.IDX.ClientSecret)
 			req, _ := http.NewRequest("POST", revokeTokenUrl, strings.NewReader(form.Encode()))
 			h := req.Header
 			h.Add("Accept", "application/json")
 			h.Add("Content-Type", "application/x-www-form-urlencoded")
 
-	        client := &http.Client{Timeout: time.Second * 30}
+			client := &http.Client{Timeout: time.Second * 30}
 			resp, err := client.Do(req)
 			if err != nil {
 				body, _ := ioutil.ReadAll(resp.Body)
@@ -388,9 +384,9 @@ func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 
 func (s *Server) verifyToken(t string) (*verifier.Jwt, error) {
 	tv := map[string]string{}
-	tv["aud"] = s.config.Okta.IDX.ClientID
+	tv["aud"] = s.idxClient.Config().Okta.IDX.ClientID
 	jv := verifier.JwtVerifier{
-		Issuer:           s.config.Okta.IDX.Issuer,
+		Issuer:           s.idxClient.Config().Okta.IDX.Issuer,
 		ClaimsToValidate: tv,
 	}
 
@@ -419,13 +415,7 @@ func (s *Server) getProfileData(r *http.Request) map[string]string {
 		return m
 	}
 
-	var reqUrl string
-	if strings.Contains(s.config.Okta.IDX.Issuer, "oauth2") {
-		reqUrl = s.config.Okta.IDX.Issuer + "/v1/userinfo"
-	} else {
-		reqUrl = s.config.Okta.IDX.Issuer + "/oauth2/v1/userinfo"
-	}
-
+	reqUrl := s.oAuthEndPoint("userinfo")
 	req, _ := http.NewRequest("GET", reqUrl, bytes.NewReader([]byte("")))
 	h := req.Header
 	h.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
@@ -504,21 +494,15 @@ func generateNonce() (string, error) {
 // Get the interaction handle to begin the flow. Use this
 // value when initializing the Okta sign in widget.
 func (s *Server) getInteractionHandle(codeChallenge string) (string, error) {
+
 	data := url.Values{}
-	data.Set("client_id", s.config.Okta.IDX.ClientID)
-	data.Set("scope", strings.Join(s.config.Okta.IDX.Scopes, " "))
+	data.Set("scope", strings.Join(s.idxClient.Config().Okta.IDX.Scopes, " "))
 	data.Set("code_challenge", codeChallenge)
 	data.Set("code_challenge_method", "S256")
-	data.Set("redirect_uri", s.config.Okta.IDX.RedirectURI)
+	data.Set("redirect_uri", s.idxClient.Config().Okta.IDX.RedirectURI)
 	data.Set("state", s.state)
 
-	var endpoint string
-	if strings.Contains(s.config.Okta.IDX.Issuer, "oauth2") {
-		endpoint = s.config.Okta.IDX.Issuer + "/v1/interact"
-	} else {
-		endpoint = s.config.Okta.IDX.Issuer + "/oauth2/v1/interact"
-	}
-
+	endpoint := s.oAuthEndPoint("interact")
 	req, err := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(data.Encode()))
 	if err != nil {
 		return "", fmt.Errorf("failed to create interact http request: %w", err)
@@ -544,4 +528,15 @@ func (s *Server) getInteractionHandle(codeChallenge string) (string, error) {
 	}
 
 	return interactionHandle.InteractionHandle, nil
+}
+
+func (s *Server) oAuthEndPoint(operation string) string {
+	var endPoint string
+	issuer := s.idxClient.Config().Okta.IDX.Issuer
+	if strings.Contains(issuer, "oauth2") {
+		endPoint = fmt.Sprintf("%s/v1/%s", issuer, operation)
+	} else {
+		endPoint = fmt.Sprintf("%s/oauth2/v1/%s", issuer, operation)
+	}
+	return endPoint
 }

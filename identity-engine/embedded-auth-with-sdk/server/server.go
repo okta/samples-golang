@@ -57,14 +57,17 @@ type ViewData map[string]interface{}
 var sessionStore = sessions.NewCookieStore([]byte("okta-direct-auth-session-store"))
 
 func NewServer(c *config.Config) *Server {
-	idx, err := idx.NewClient(
-		idx.WithClientID(c.Okta.IDX.ClientID),
-		idx.WithClientSecret(c.Okta.IDX.ClientSecret),
-		idx.WithIssuer(c.Okta.IDX.Issuer),
-		idx.WithScopes(c.Okta.IDX.Scopes),
-		idx.WithRedirectURI(c.Okta.IDX.RedirectURI))
+	idx, err := idx.NewClient()
 	if err != nil {
 		log.Fatalf("new client error: %+v", err)
+	}
+
+	// NOTE: The cucumber testing harness Okta uses to ensure the golang samples
+	// remain operational needs to be throttled so it doesn't get rate limited
+	// by too many concurrent requests in tests. The idx client allows the
+	// ability to set a custom http client and we make use of that feature here.
+	if c.HttpClient != nil {
+		idx = idx.WithHTTPClient(c.HttpClient)
 	}
 
 	return &Server{
@@ -708,7 +711,7 @@ func (s *Server) parseTemplates() {
 	var err error
 	t := template.New("")
 
-	s.view = views.NewView(s.config, sessionStore)
+	s.view = views.NewView(s.idxClient, sessionStore)
 
 	s.tpl, err = t.Funcs(s.view.TemplateFuncs()).ParseGlob("views/*.gohtml")
 
@@ -787,10 +790,11 @@ func (s *Server) getProfileData(r *http.Request) map[string]string {
 	}
 
 	var reqUrl string
-	if strings.Contains(s.config.Okta.IDX.Issuer, "oauth2") {
-		reqUrl = s.config.Okta.IDX.Issuer + "/v1/userinfo"
+	issuer := s.idxClient.Config().Okta.IDX.Issuer
+	if strings.Contains(issuer, "oauth2") {
+		reqUrl = issuer + "/v1/userinfo"
 	} else {
-		reqUrl = s.config.Okta.IDX.Issuer + "/oauth2/v1/userinfo"
+		reqUrl = issuer + "/oauth2/v1/userinfo"
 	}
 
 	req, _ := http.NewRequest("GET", reqUrl, bytes.NewReader([]byte("")))

@@ -23,7 +23,6 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -81,18 +80,8 @@ func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 		cfg := &config.Config{
 			Testing: true,
 		}
-		err := config.ReadConfig(cfg)
-		if err != nil {
-			log.Fatal(err)
-		}
-		orgUrl, err := url.Parse(cfg.Okta.IDX.Issuer)
-		if err != nil {
-			log.Fatal(err)
-		}
 		_, client, err := okta.NewClient(
 			context.Background(),
-			okta.WithOrgUrl(fmt.Sprintf("https://%s", orgUrl.Host)),
-			okta.WithToken(os.Getenv("OKTA_CLIENT_TOKEN")),
 			okta.WithHttpClientPtr(th.httpClient),
 		)
 		if err != nil {
@@ -104,7 +93,6 @@ func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 		th.server = srv
 
 		th.depopulateMary()
-		//	th.fillInOrgInfo()
 
 		srv.Run()
 	})
