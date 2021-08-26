@@ -1,4 +1,4 @@
-@8 @no-ci
+@8
 Feature: Basic Login with Embedded Sign In Widget
 
   Background:
@@ -8,8 +8,10 @@ Feature: Basic Login with Embedded Sign In Widget
   Scenario: 8.1.1 Mary logs in with a Password
     Given Mary navigates to the Embedded Widget View
     When she fills in her correct username
+    And she clicks the "Next" button
+    And she selects password factor
     And she fills in her correct password
-    And she submits the Login form
+    And she clicks the "Verify" button
     Then she is redirected to the Root View
     Then she navigates to the Profile View
     And she sees a table with her profile info
