@@ -44,7 +44,7 @@ go run main.go
 
 Now navigate to http://localhost:8080 in your browser.
 
-If you see a home page that prompts you to login, then things are working!  Clicking the **Log in** button will redirect you to the applicaitons custom sign-in page.
+If you see a home page that prompts you to login, then things are working!  Clicking the **Log in** button will redirect you to the applications custom sign-in page.
 
 You can login with the same account that you created when signing up for your Developer Org, or you can use a known username and password from your Okta Directory.
 
