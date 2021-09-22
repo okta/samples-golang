@@ -6,7 +6,6 @@
   config.baseUrl = "{{ .BaseUrl }}";
   config.clientId = "{{ .ClientId }}";
   config.redirectUri = "http://localhost:8000/login/callback";
-  config.interactionHandle = "{{ .InteractionHandle }}";
   config.useInteractionCodeFlow = "true";
   config.codeChallenge = "{{ .Pkce.CodeChallenge }}";
   config.codeChallengeMethod = "{{ .Pkce.CodeChallengeMethod }}";
