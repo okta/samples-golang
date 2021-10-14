@@ -79,6 +79,18 @@ func (th *TestHarness) facebookUser() error {
 	return nil
 }
 
+func (th *TestHarness) clicksNextButton() error {
+	return th.submitsForm(`input[type="submit"]`, "Next")
+}
+
+func (th *TestHarness) clicksVerifyButton() error {
+	return th.submitsForm(`input[type="submit"]`, "Verify")
+}
+
+func (th *TestHarness) selectsPasswordFactor() error {
+	return th.clicksButtonWithText(`div[data-se="okta_password"] a`, "Select")
+}
+
 func (th *TestHarness) clicksSigninWithGoogle() error {
 	if err := th.clickLink("Sign in with Google"); err != nil {
 		return err
@@ -305,7 +317,12 @@ func (th *TestHarness) fillsInPassword() error {
 	if th.currentProfile == nil {
 		return errors.New("test harness doesn't have a current profile")
 	}
-	return th.fillsInFormValue(`input[name="credentials.passcode"]`, th.currentProfile.Password, th.waitForLoginForm)
+	err := th.fillsInFormValue(`input[name="credentials.passcode"]`, th.currentProfile.Password, th.waitForLoginForm)
+	if err != nil {
+		err = th.fillsInFormValue(`input[name="identifier"]`, th.currentProfile.Password, th.waitForLoginForm)
+	}
+
+	return err
 }
 
 func (th *TestHarness) seesElement(selector string) error {
