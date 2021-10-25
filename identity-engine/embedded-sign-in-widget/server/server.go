@@ -157,7 +157,7 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	if session.Values["pkceData"] == nil || session.Values["pkceData"] == "" {
+	if _, found := session.Values["pkce_code_verifier"]; !found {
 		s.pkce, err = createPKCEData()
 		if err != nil {
 			log.Fatalf("could not create pkce data: %s\n", err.Error())
@@ -167,9 +167,11 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		session.Values["pkce_code_challenge_method"] = s.pkce.CodeChallengeMethod
 		session.Save(r, w)
 	} else {
-		s.pkce.CodeVerifier = session.Values["pkce_code_verifier"].(string)
-		s.pkce.CodeChallenge = session.Values["pkce_code_challenge"].(string)
-		s.pkce.CodeChallengeMethod = session.Values["pkce_code_challenge_method"].(string)
+		s.pkce = &PKCE{
+			CodeChallenge:       session.Values["pkce_code_challenge"].(string),
+			CodeVerifier:        session.Values["pkce_code_verifier"].(string),
+			CodeChallengeMethod: session.Values["pkce_code_challenge_method"].(string),
+		}
 	}
 
 	nonce, err := generateNonce()
@@ -206,12 +208,6 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
-	// Check the state that was returned in the query string is the same as the above state
-	if r.URL.Query().Get("state") != s.state {
-		fmt.Fprintln(w, "The state was not as expected")
-		return
-	}
-
 	// Check if interaction_required error is returned
 	if r.URL.Query().Get("error") == "interaction_required" {
 		w.Header().Add("Cache-Control", "no-cache")
@@ -245,7 +241,13 @@ func (s *Server) LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Make sure the interaction_code was provided
+	// Check the state that was returned in the query string is the same as the above state
+	if r.URL.Query().Get("state") != s.state {
+		fmt.Fprintln(w, "The state was not as expected")
+		return
+	}
+
+	// Check that the interaction_code was provided
 	if r.URL.Query().Get("interaction_code") == "" {
 		fmt.Fprintln(w, "The interaction_code was not returned or is not accessible")
 		return
@@ -256,15 +258,6 @@ func (s *Server) LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	if session.Values["pkce_code_verifier"] == nil ||
-		session.Values["pkce_code_verifier"] == "" ||
-		session.Values["pkce_code_challenge"] == nil ||
-		session.Values["pkce_code_challenge"] == "" ||
-		session.Values["pkce_code_challenge_method"] == nil ||
-		session.Values["pkce_code_challenge_method"] == "" {
-		fmt.Fprintln(w, "Could not get PKCE Data from session")
-		return
-	}
 	q := r.URL.Query()
 	q.Del("state")
 
