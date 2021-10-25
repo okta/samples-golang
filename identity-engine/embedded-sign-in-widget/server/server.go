@@ -162,8 +162,7 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if session.Values["pkceData"] == nil || session.Values["pkceData"] == "" {
 		s.pkce, err = createPKCEData()
 		if err != nil {
-			fmt.Printf("could not create pkce data: %s\n", err.Error())
-			os.Exit(1)
+			log.Fatalf("could not create pkce data: %s\n", err.Error())
 		}
 		session.Values["pkce_code_verifier"] = s.pkce.CodeVerifier
 		session.Values["pkce_code_challenge"] = s.pkce.CodeChallenge
@@ -177,14 +176,12 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	nonce, err := generateNonce()
 	if err != nil {
-		fmt.Printf("error: %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("error: %s\n", err.Error())
 	}
 	issuerURL := s.idxClient.Config().Okta.IDX.Issuer
 	issuerParts, err := url.Parse(issuerURL)
 	if err != nil {
-		fmt.Printf("error: %s\n", err.Error())
-		os.Exit(1)
+		log.Fatalf("error: %s\n", err.Error())
 	}
 	baseUrl := issuerParts.Scheme + "://" + issuerParts.Hostname()
 	data := struct {
@@ -224,8 +221,7 @@ func (s *Server) LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		issuerURL := s.idxClient.Config().Okta.IDX.Issuer
 		issuerParts, err := url.Parse(issuerURL)
 		if err != nil {
-			fmt.Printf("error: %s\n", err.Error())
-			os.Exit(1)
+			log.Fatalf("error: %s\n", err.Error())
 		}
 		baseUrl := issuerParts.Scheme + "://" + issuerParts.Hostname()
 
