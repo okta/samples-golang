@@ -37,7 +37,6 @@ import (
 	"github.com/gorilla/sessions"
 	idx "github.com/okta/okta-idx-golang"
 	verifier "github.com/okta/okta-jwt-verifier-golang"
-	"github.com/patrickmn/go-cache"
 
 	"github.com/okta/samples-golang/identity-engine/embedded-sign-in-widget/config"
 )
@@ -68,7 +67,6 @@ type Server struct {
 	tpl          *template.Template
 	sessionStore *sessions.CookieStore
 	ViewData     ViewData
-	cache        *cache.Cache
 	svc          *http.Server
 	address      string
 	pkce         *PKCE
@@ -92,7 +90,6 @@ func NewServer(c *config.Config) *Server {
 		tpl:          template.Must(template.ParseGlob("templates/*.gohtml")),
 		idxClient:    idx,
 		sessionStore: sessions.NewCookieStore([]byte("randomKey")),
-		cache:        cache.New(5*time.Minute, 10*time.Minute),
 		ViewData: map[string]interface{}{
 			"Authenticated": false,
 			"Errors":        "",
@@ -115,6 +112,7 @@ func (s *Server) Run() {
 	r.HandleFunc("/login/callback", s.LoginCallbackHandler).Methods("GET")
 	r.HandleFunc("/profile", s.ProfileHandler).Methods("GET")
 	r.HandleFunc("/logout", s.LogoutHandler).Methods("POST")
+	r.HandleFunc("/logout", s.LogoutHandler).Methods("GET")
 
 	addr := "localhost:8000"
 	logger := log.New(os.Stderr, "http: ", log.LstdFlags)
@@ -304,8 +302,9 @@ func (s *Server) LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		log.Fatalf("Verification Error: %+v\n", verificationError)
 	}
 
-	s.cache.Add(fmt.Sprintf("%s-id_token", session.ID), exchange.IdToken, time.Hour)
-	s.cache.Add(fmt.Sprintf("%s-access_token", session.ID), exchange.AccessToken, time.Hour)
+	session.Values["id_token"] = exchange.IdToken
+	session.Values["access_token"] = exchange.AccessToken
+	session.Save(r, w)
 
 	http.Redirect(w, r, "/", http.StatusFound)
 }
@@ -322,9 +321,9 @@ func (s *Server) ProfileHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) LogoutHandler(w http.ResponseWriter, r *http.Request) {
-	// revoke the oauth2 access token it exists in the session API side before flushing cache
-	if session, err := s.sessionStore.Get(r, SESSION_STORE_NAME); err != nil {
-		if accessToken, found := s.cache.Get(fmt.Sprintf("%s-access_token", session.ID)); found {
+	// revoke the oauth2 access token it exists in the session API side before deleting session info
+	if session, err := s.sessionStore.Get(r, SESSION_STORE_NAME); err == nil {
+		if accessToken, found := session.Values["access_token"]; found {
 			revokeTokenUrl := s.oAuthEndPoint("revoke")
 			form := url.Values{}
 			form.Set("token", accessToken.(string))
@@ -344,9 +343,15 @@ func (s *Server) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			defer resp.Body.Close()
 		}
+
+		delete(session.Values, "id_token")
+		delete(session.Values, "access_token")
+		delete(session.Values, "pkce_code_verifier")
+		delete(session.Values, "pkce_code_challenge")
+		delete(session.Values, "pkce_code_challenge_method")
+		session.Save(r, w)
 	}
 
-	s.cache.Flush()
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
@@ -382,42 +387,28 @@ func (s *Server) verifyToken(t string) (*verifier.Jwt, error) {
 func (s *Server) getProfileData(r *http.Request) map[string]string {
 	m := make(map[string]string)
 
-	session, err := s.sessionStore.Get(r, SESSION_STORE_NAME)
+	session, _ := s.sessionStore.Get(r, SESSION_STORE_NAME)
+	if accessToken, found := session.Values["access_token"]; found {
+		reqUrl := s.oAuthEndPoint("userinfo")
+		req, _ := http.NewRequest("GET", reqUrl, bytes.NewReader([]byte("")))
+		h := req.Header
+		h.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+		h.Add("Accept", "application/json")
 
-	accessToken := session.Values["access_token"]
-	if accessToken == nil || accessToken == "" {
-		accessToken, _ = s.cache.Get(fmt.Sprintf("%s-access_token", session.ID))
+		client := &http.Client{Timeout: time.Second * 30}
+		resp, _ := client.Do(req)
+		body, _ := ioutil.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		json.Unmarshal(body, &m)
 	}
-	if err != nil || accessToken == nil || accessToken == "" {
-		return m
-	}
-
-	reqUrl := s.oAuthEndPoint("userinfo")
-	req, _ := http.NewRequest("GET", reqUrl, bytes.NewReader([]byte("")))
-	h := req.Header
-	h.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
-	h.Add("Accept", "application/json")
-
-	client := &http.Client{Timeout: time.Second * 30}
-	resp, _ := client.Do(req)
-	body, _ := ioutil.ReadAll(resp.Body)
-	defer resp.Body.Close()
-	json.Unmarshal(body, &m)
 
 	return m
 }
 
 func (s *Server) isAuthenticated(r *http.Request) bool {
-	session, err := s.sessionStore.Get(r, SESSION_STORE_NAME)
-	idToken := session.Values["id_token"]
-	if idToken == nil || idToken == "" {
-		idToken, _ = s.cache.Get(fmt.Sprintf("%s-id_token", session.ID))
-	}
-	if err != nil || idToken == nil || idToken == "" {
-		return false
-	}
-
-	return true
+	session, _ := s.sessionStore.Get(r, SESSION_STORE_NAME)
+	_, found := session.Values["id_token"]
+	return found
 }
 
 // Creates a codeVerifier that is used for PKCE
