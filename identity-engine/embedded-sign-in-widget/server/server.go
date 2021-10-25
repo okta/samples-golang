@@ -317,24 +317,9 @@ func (s *Server) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	// revoke the oauth2 access token it exists in the session API side before deleting session info
 	if session, err := s.sessionStore.Get(r, SESSION_STORE_NAME); err == nil {
 		if accessToken, found := session.Values["access_token"]; found {
-			revokeTokenUrl := s.oAuthEndPoint("revoke")
-			form := url.Values{}
-			form.Set("token", accessToken.(string))
-			form.Set("token_type_hint", "access_token")
-			form.Add("client_id", s.idxClient.Config().Okta.IDX.ClientID)
-			form.Add("client_secret", s.idxClient.Config().Okta.IDX.ClientSecret)
-			req, _ := http.NewRequest("POST", revokeTokenUrl, strings.NewReader(form.Encode()))
-			h := req.Header
-			h.Add("Accept", "application/json")
-			h.Add("Content-Type", "application/x-www-form-urlencoded")
-
-			client := &http.Client{Timeout: time.Second * 30}
-			resp, err := client.Do(req)
-			if err != nil {
-				body, _ := ioutil.ReadAll(resp.Body)
-				fmt.Printf("revoke error; status: %s, body: %s\n", resp.Status, string(body))
+			if err := s.idxClient.RevokeToken(r.Context(), accessToken.(string)); err != nil {
+				fmt.Printf("revoke error: %+v\n", err)
 			}
-			defer resp.Body.Close()
 		}
 
 		delete(session.Values, "id_token")
