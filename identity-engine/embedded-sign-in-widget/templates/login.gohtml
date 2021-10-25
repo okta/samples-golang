@@ -2,26 +2,28 @@
 
 <div id="okta-signin-widget-container"></div>
 <script type="text/javascript">
-  var config = {};
-  config.baseUrl = "{{ .BaseUrl }}";
-  config.clientId = "{{ .ClientId }}";
-  config.redirectUri = "http://localhost:8000/login/callback";
-  config.useInteractionCodeFlow = "true";
-  config.codeChallenge = "{{ .Pkce.CodeChallenge }}";
-  config.codeChallengeMethod = "{{ .Pkce.CodeChallengeMethod }}";
-  config.state = "{{ .State }}" || false,
-  config.debug = true,
-  config.authParams = {
-    issuer: "{{ .Issuer }}",
-    scopes: ['openid', 'profile', 'email'],
+  const widgetConfig = {
+    baseUrl: "{{ .BaseUrl }}",
+    clientId: "{{ .ClientId }}",
+    redirectUri: "{{ .RedirectURI }}",
+    authParams: {
+      issuer: "{{ .Issuer }}",
+      scopes: ['openid', 'profile', 'email'],
+    },
+    useInteractionCodeFlow: true,
+    state: ("{{ .State }}" || false),
+    interactionHandle: "{{ .InteractionHandle }}",
+    codeChallenge: "{{ .CodeChallenge }}",
+    codeChallengeMethod: "{{ .CodeChallengeMethod }}",
+    debug: true,
   };
   const signIn = new OktaSignIn({
     el: '#okta-signin-widget-container',
-    ...config
+    ...widgetConfig
   });
   signIn.showSignInAndRedirect()
     .catch(err => {
-      console.log('Error happen in showSignInAndRedirect: ', err);
+      console.log('Error in showSignInAndRedirect: ', err);
     });
 </script>
 
