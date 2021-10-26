@@ -206,7 +206,7 @@ func (s *Server) LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	accessToken, err := s.idxClient.RedeemInteractionCode(s.currentIdxContext, r.URL.Query().Get("interaction_code"))
+	accessToken, err := s.idxClient.RedeemInteractionCode(r.Context(), s.currentIdxContext, r.URL.Query().Get("interaction_code"))
 	if err != nil {
 		log.Fatalf("access token error: %+v\n", err)
 	}

@@ -223,6 +223,12 @@ github.com/okta/okta-idx-golang v0.2.2-0.20211025225739-bf9d89257db3 h1:pQcXhksn
 github.com/okta/okta-idx-golang v0.2.2-0.20211025225739-bf9d89257db3/go.mod h1:N3+FRewqAGrPJIxTUfO0AqAgStLM7co4oXon1za7Qno=
 github.com/okta/okta-idx-golang v0.2.2-0.20211025232445-cf7822187a48 h1:Y4nN9jeC/wZRaL3F2B44AXh7XhuE04ySUJ0mEZxEUT8=
 github.com/okta/okta-idx-golang v0.2.2-0.20211025232445-cf7822187a48/go.mod h1:N3+FRewqAGrPJIxTUfO0AqAgStLM7co4oXon1za7Qno=
+github.com/okta/okta-idx-golang v0.2.2-0.20211026182441-bf5586e144f5 h1:kO5NWv3bO9x3ZmgVFuxydCgSepnJnUgT+raXIuZtRDc=
+github.com/okta/okta-idx-golang v0.2.2-0.20211026182441-bf5586e144f5/go.mod h1:N3+FRewqAGrPJIxTUfO0AqAgStLM7co4oXon1za7Qno=
+github.com/okta/okta-idx-golang v0.2.2-0.20211026183355-e922924d4fb0 h1:LvLJ4MP6aItkJ/wtt3q+a0UUAplUpi6y5sjA8ikG7pk=
+github.com/okta/okta-idx-golang v0.2.2-0.20211026183355-e922924d4fb0/go.mod h1:N3+FRewqAGrPJIxTUfO0AqAgStLM7co4oXon1za7Qno=
+github.com/okta/okta-idx-golang v0.2.2 h1:7vqwYPlmfiGZKJ33F13tN3BIAe8BimKvJhkp2fqZGPg=
+github.com/okta/okta-idx-golang v0.2.2/go.mod h1:N3+FRewqAGrPJIxTUfO0AqAgStLM7co4oXon1za7Qno=
 github.com/okta/okta-jwt-verifier-golang v1.1.1 h1:yL4uSwtVQ6L3m2Pq8tcVUbb8e/SZ7p/r6eduqq1YjBM=
 github.com/okta/okta-jwt-verifier-golang v1.1.1/go.mod h1:Nw85EhrNXkWgfkhE9lggRoRVZLVm7zf/ZtglDUzkKU8=
 github.com/okta/okta-sdk-golang/v2 v2.3.1-0.20210519105407-20ace51aad26 h1:GslfCBAaOiuJ04Vm/3SFptoLZm0nzdOO6DYuWGnteK4=
