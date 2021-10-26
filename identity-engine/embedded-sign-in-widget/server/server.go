@@ -18,8 +18,6 @@ package server
 
 import (
 	"bytes"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -51,7 +49,6 @@ type Server struct {
 	LoginData         LoginData
 	svc               *http.Server
 	address           string
-	state             string
 }
 
 type LoginData struct {
@@ -72,16 +69,11 @@ func NewServer(c *config.Config) *Server {
 		log.Fatalf("new client error: %+v", err)
 	}
 
-	// Generate random byte array for state parameter
-	b := make([]byte, 16)
-	rand.Read(b)
-
 	return &Server{
 		config:       c,
 		tpl:          template.Must(template.ParseGlob("templates/*.gohtml")),
 		idxClient:    idx,
 		sessionStore: sessions.NewCookieStore([]byte("randomKey")),
-		state:        hex.EncodeToString(b),
 	}
 }
 
@@ -165,7 +157,7 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		RedirectURI:         s.idxClient.Config().Okta.IDX.RedirectURI,
 		ClientId:            s.idxClient.Config().Okta.IDX.ClientID,
 		Issuer:              s.idxClient.Config().Okta.IDX.Issuer,
-		State:               s.state,
+		State:               s.currentIdxContext.State,
 		CodeChallenge:       s.currentIdxContext.CodeChallenge,
 		CodeChallengeMethod: s.currentIdxContext.CodeChallengeMethod,
 		InteractionHandle:   s.currentIdxContext.InteractionHandle.InteractionHandle,
@@ -190,8 +182,8 @@ func (s *Server) LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check the state that was returned in the query string is the same as the above state
-	if r.URL.Query().Get("state") != s.state {
-		fmt.Fprintln(w, "The state was not as expected")
+	if r.URL.Query().Get("state") != s.currentIdxContext.State {
+		fmt.Fprintf(w, "The state was not as expected, got %q, expected %q", r.URL.Query().Get("state"), s.currentIdxContext.State)
 		return
 	}
 
