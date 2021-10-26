@@ -145,11 +145,13 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		log.Fatalf("error idx client init login: %+v", err)
 	}
 
-	idxContext, err := s.idxClient.Interact(r.Context())
-	if err != nil {
-		log.Fatalf("error idx context: %+v", err)
+	if s.currentIdxContext == nil {
+		idxContext, err := s.idxClient.Interact(r.Context())
+		if err != nil {
+			log.Fatalf("error idx context: %+v", err)
+		}
+		s.currentIdxContext = idxContext
 	}
-	s.currentIdxContext = idxContext
 
 	issuerURL := s.idxClient.Config().Okta.IDX.Issuer
 	issuerParts, err := url.Parse(issuerURL)
@@ -164,9 +166,9 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		ClientId:            s.idxClient.Config().Okta.IDX.ClientID,
 		Issuer:              s.idxClient.Config().Okta.IDX.Issuer,
 		State:               s.state,
-		CodeChallenge:       idxContext.CodeChallenge,
-		CodeChallengeMethod: idxContext.CodeChallengeMethod,
-		InteractionHandle:   idxContext.InteractionHandle.InteractionHandle,
+		CodeChallenge:       s.currentIdxContext.CodeChallenge,
+		CodeChallengeMethod: s.currentIdxContext.CodeChallengeMethod,
+		InteractionHandle:   s.currentIdxContext.InteractionHandle.InteractionHandle,
 	}
 	err = s.tpl.ExecuteTemplate(w, "login.gohtml", s.LoginData)
 	if err != nil {
@@ -253,6 +255,8 @@ func (s *Server) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		session.Save(r, w)
 	}
 
+	// reset the idx context
+	s.currentIdxContext = nil
 	http.Redirect(w, r, logoutURL, http.StatusFound)
 }
 
