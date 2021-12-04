@@ -29,13 +29,11 @@ import (
 	"time"
 
 	"github.com/cucumber/godog"
-	"github.com/cucumber/messages-go/v10"
 	"github.com/okta/okta-sdk-golang/v2/okta"
 	"github.com/okta/okta-sdk-golang/v2/okta/query"
-	"github.com/tebeka/selenium"
-
 	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/config"
 	"github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk/server"
+	"github.com/tebeka/selenium"
 )
 
 const (
@@ -198,29 +196,30 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 
 	th.capabilities = capabilities
 
-	ctx.BeforeScenario(func(sc *messages.Pickle) {
+	ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
 		th.capabilities["name"] = fmt.Sprintf("Golang (%s / %s) Sample App - %q", os.Getenv("TRAVIS_GO_VERSION"), os.Getenv("TRAVIS_REPO_SLUG"), sc.Name)
 		var err error
 		th.wd, err = selenium.NewRemote(th.capabilities, seleniumUrl)
 		if err != nil {
-			log.Panic(err)
+			return ctx, err
 		}
+		return ctx, nil
 	})
 
-	ctx.AfterScenario(func(sc *messages.Pickle, err error) {
+	ctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
 		if err != nil {
-			fmt.Printf("AfterScenario error: %+v\n", err)
+			return ctx, fmt.Errorf("AfterScenario error: %+v\n", err)
 		}
 
 		// always reset the given profile
 		err = th.destroyCurrentProfile()
 		if err != nil {
-			fmt.Printf("AfterScenario error destroying profile: %+v\n", err)
+			return ctx, fmt.Errorf("AfterScenario error destroying profile: %+v\n", err)
 		}
 
 		err = th.resetAppSignOnPolicyRule()
 		if err != nil {
-			fmt.Printf("AfterScenario error reseting Sign On Policy (next tests might fail): %+v\n", err)
+			return ctx, fmt.Errorf("AfterScenario error reseting Sign On Policy (next tests might fail): %+v\n", err)
 		}
 
 		// always force a logout
@@ -228,8 +227,9 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 		_, _ = th.wd.ExecuteScript(logoutXHR, nil)
 		err = th.wd.Quit()
 		if err != nil {
-			fmt.Printf("AfterScenario error quiting web driver: %+v\n", err)
+			return ctx, fmt.Errorf("AfterScenario error quiting web driver: %+v\n", err)
 		}
+		return ctx, nil
 	})
 
 	ctx.Step(`there is an existing user`, th.existingUser)
