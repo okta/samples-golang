@@ -112,6 +112,9 @@ func (s *Server) Run() {
 	r.HandleFunc("/login/factors/phone/method", s.handleLoginPhoneVerificationMethod).Methods("GET")
 	r.HandleFunc("/login/factors/phone", s.handleLoginPhoneVerification).Methods("GET")
 	r.HandleFunc("/login/factors/phone", s.handleLoginPhoneConfirmation).Methods("POST")
+	r.HandleFunc("/login/factors/google_auth", s.handleLoginGoogleAuth).Methods("GET")
+	r.HandleFunc("/login/factors/google_auth", s.handleLoginGoogleAuthConfirmation).Methods("POST")
+	r.HandleFunc("/login/factors/google_auth/init", s.handleLoginGoogleAuthInit).Methods("GET")
 
 	r.HandleFunc("/login/callback", s.handleLoginCallback).Methods("GET")
 

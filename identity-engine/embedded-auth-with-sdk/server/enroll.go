@@ -349,16 +349,13 @@ func (s *Server) enrollGoogleAuth(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
 		return
 	}
-	invCode, ok := s.ViewData["InvalidGoogleAuthCode"]
-	if !ok || !invCode.(bool) {
-		enrollResponse, err := enrollResponse.GoogleAuthInit(r.Context())
-		if err != nil {
-			http.Redirect(w, r, "/enrollFactor", http.StatusFound)
-			return
-		}
-		s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
-		s.ViewData["QRCode"] = template.URL(enrollResponse.ContextualData().QRcode.Href)
+	enrollResponse, err := enrollResponse.GoogleAuthInit(r.Context())
+	if err != nil {
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
 	}
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+	s.ViewData["QRCode"] = template.URL(enrollResponse.ContextualData().QRcode.Href)
 	s.render("enrollGoogleAuth.gohtml", w, r)
 }
 
@@ -394,13 +391,11 @@ func (s *Server) handleEnrollGoogleAuthCode(w http.ResponseWriter, r *http.Reque
 	}
 	enrollResponse, err = enrollResponse.GoogleAuthConfirm(r.Context(), r.FormValue("code"))
 	if err != nil {
-		s.ViewData["InvalidGoogleAuthCode"] = true
 		session.Values["Errors"] = err.Error()
 		session.Save(r, w)
 		s.render("enrollGoogleAuthCode.gohtml", w, r)
 		return
 	}
-	s.ViewData["InvalidGoogleAuthCode"] = false
 	// If we have tokens we have success, so lets store tokens
 	if enrollResponse.Token() != nil {
 		session, err := sessionStore.Get(r, "direct-auth")

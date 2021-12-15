@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -119,30 +120,72 @@ func (s *Server) handleLoginSecondaryFactors(w http.ResponseWriter, r *http.Requ
 	clr, _ := s.cache.Get("loginResponse")
 	lr := clr.(*idx.LoginResponse)
 
-	if lr.HasStep(idx.LoginStepEmailVerification) {
-		s.ViewData["FactorEmail"] = true
-	} else {
-		s.ViewData["FactorEmail"] = false
-	}
-	if lr.HasStep(idx.LoginStepPhoneVerification) || lr.HasStep(idx.LoginStepPhoneInitialVerification) {
-		s.ViewData["FactorPhone"] = true
-	} else {
-		s.ViewData["FactorPhone"] = false
-	}
+	s.ViewData["FactorEmail"] = lr.HasStep(idx.LoginStepEmailVerification)
+	s.ViewData["FactorPhone"] = lr.HasStep(idx.LoginStepPhoneVerification) || lr.HasStep(idx.LoginStepPhoneInitialVerification)
+	s.ViewData["FactorGoogleAuth"] = lr.HasStep(idx.LoginStepGoogleAuthenticatorInitialVerification) || lr.HasStep(idx.LoginStepGoogleAuthenticatorConfirmation)
+	s.ViewData["FactorSkip"] = lr.HasStep(idx.LoginStepSkip)
+
 	s.render("loginSecondaryFactors.gohtml", w, r)
 }
 
 func (s *Server) handleLoginSecondaryFactorsProceed(w http.ResponseWriter, r *http.Request) {
 	delete(s.ViewData, "InvalidEmailCode")
+	submit := r.FormValue("submit")
+	if submit == "Skip" {
+		clr, _ := s.cache.Get("loginResponse")
+		lr := clr.(*idx.LoginResponse)
+		s.loginTransitionToProfile(lr, w, r)
+		return
+	}
 	pushFactor := r.FormValue("push_factor")
-	if pushFactor == "push_email" {
+	switch pushFactor {
+	case "push_email":
 		http.Redirect(w, r, "/login/factors/email", http.StatusFound)
 		return
-	}
-	if pushFactor == "push_phone" {
+	case "push_phone":
 		http.Redirect(w, r, "/login/factors/phone/method", http.StatusFound)
 		return
+	case "push_google_auth":
+		http.Redirect(w, r, "/login/factors/google_auth", http.StatusFound)
+		return
 	}
+	http.Redirect(w, r, "/login/factors", http.StatusFound)
+}
+
+func (s *Server) loginTransitionToProfile(er *idx.LoginResponse, w http.ResponseWriter, r *http.Request) {
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+
+	lr, err := er.Skip(r.Context())
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	s.cache.Set("loginResponse", lr, time.Minute*5)
+
+	if lr.Token() != nil {
+		session.Values["access_token"] = lr.Token().AccessToken
+		session.Values["id_token"] = lr.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+		// redirect the user to /profile
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	lr, err = lr.WhereAmI(r.Context())
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+	s.cache.Set("loginResponse", lr, time.Minute*5)
 	http.Redirect(w, r, "/login/factors", http.StatusFound)
 }
 
@@ -308,6 +351,96 @@ func (s *Server) handleLoginPhoneConfirmation(w http.ResponseWriter, r *http.Req
 	}
 	s.cache.Set("loginResponse", lr, time.Minute*5)
 	http.Redirect(w, r, "/login/factors", http.StatusFound)
+}
+
+func (s *Server) handleLoginGoogleAuth(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	if clr == nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	lr := clr.(*idx.LoginResponse)
+	if !lr.HasStep(idx.LoginStepGoogleAuthenticatorInitialVerification) && !lr.HasStep(idx.LoginStepGoogleAuthenticatorConfirmation) {
+		http.Redirect(w, r, "/login/factors", http.StatusFound)
+		return
+	}
+	if lr.HasStep(idx.LoginStepGoogleAuthenticatorConfirmation) {
+		s.render("loginGoogleAuthCode.gohtml", w, r)
+		return
+	}
+	if lr.HasStep(idx.LoginStepGoogleAuthenticatorInitialVerification) {
+		http.Redirect(w, r, "/login/factors/google_auth/init", http.StatusFound)
+		return
+	}
+	http.Redirect(w, r, "/login/factors", http.StatusFound)
+}
+
+func (s *Server) handleLoginGoogleAuthConfirmation(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	lr := clr.(*idx.LoginResponse)
+	if !lr.HasStep(idx.LoginStepGoogleAuthenticatorConfirmation) {
+		http.Redirect(w, r, "/login/factors", http.StatusFound)
+		return
+	}
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+	lr, err = lr.GoogleAuthConfirm(r.Context(), r.FormValue("code"))
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login/factors/google_auth", http.StatusFound)
+		return
+	}
+	s.cache.Set("loginResponse", lr, time.Minute*5)
+
+	// If we have tokens we have success, so lets store tokens
+	if lr.Token() != nil {
+		session, err := sessionStore.Get(r, "direct-auth")
+		if err != nil {
+			log.Fatalf("could not get store: %s", err)
+		}
+		session.Values["access_token"] = lr.Token().AccessToken
+		session.Values["id_token"] = lr.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+		// redirect the user to /profile
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	lr, err = lr.WhereAmI(r.Context())
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+	s.cache.Set("loginResponse", lr, time.Minute*5)
+	http.Redirect(w, r, "/login/factors", http.StatusFound)
+}
+
+func (s *Server) handleLoginGoogleAuthInit(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	if clr == nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	lr := clr.(*idx.LoginResponse)
+	if !lr.HasStep(idx.LoginStepGoogleAuthenticatorInitialVerification) {
+		http.Redirect(w, r, "/login/factors", http.StatusFound)
+		return
+	}
+	lr, err := lr.GoogleAuthInitialVerify(r.Context())
+	if err != nil {
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+	s.cache.Set("loginResponse", lr, time.Minute*5)
+	s.ViewData["QRCode"] = template.URL(lr.ContextualData().QRcode.Href)
+	s.render("loginGoogleAuthInitial.gohtml", w, r)
 }
 
 func (s *Server) handleLoginCallback(w http.ResponseWriter, r *http.Request) {

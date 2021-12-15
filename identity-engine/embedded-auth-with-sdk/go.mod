@@ -4,11 +4,10 @@ go 1.17
 
 require (
 	github.com/cucumber/godog v0.12.2
-	github.com/cucumber/messages-go/v10 v10.0.3
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/sessions v1.2.1
 	github.com/howeyc/fsnotify v0.9.0
-	github.com/okta/okta-idx-golang v0.2.3-0.20211204091005-67748cd5f8ad
+	github.com/okta/okta-idx-golang v0.2.3-0.20211215205254-46c62ff73f2e
 	github.com/okta/okta-sdk-golang/v2 v2.9.2
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/spf13/pflag v1.0.5
@@ -25,13 +24,13 @@ require (
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0 // indirect
 	github.com/goccy/go-json v0.3.5 // indirect
 	github.com/gofrs/uuid v4.0.0+incompatible // indirect
-	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/gorilla/securecookie v1.1.1 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.0 // indirect
 	github.com/hashicorp/go-memdb v1.3.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	github.com/lestrrat-go/backoff/v2 v2.0.7 // indirect
 	github.com/lestrrat-go/httpcc v1.0.0 // indirect
 	github.com/lestrrat-go/iter v1.0.0 // indirect
