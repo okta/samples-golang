@@ -94,10 +94,12 @@ type TestHarness struct {
 }
 
 type orgData struct {
-	policyID           string
-	mfaRuleID          string
-	mfaRequiredGroupID string
-	everyoneGroupID    string
+	signOnPolicy        string
+	signOnPolicyRule    string
+	mfaRequiredGroupID  string
+	everyoneGroupID     string
+	mfaEnrollPolicy     string
+	mfaEnrollPolicyRule string
 }
 
 func NewTestHarness() *TestHarness {
@@ -132,7 +134,6 @@ func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 
 		srv.Run()
 	})
-
 	ctx.AfterSuite(func() {
 	})
 }
@@ -222,6 +223,11 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 		err = th.resetAppSignOnPolicyRule()
 		if err != nil {
 			return ctx, fmt.Errorf("AfterScenario error reseting Sign On Policy (next tests might fail): %+v\n", err)
+		}
+
+		err = th.disableMFAEnrollRules()
+		if err != nil {
+			return ctx, fmt.Errorf("AfterScenario error reseting MFA Enroll Policy (next tests might fail): %+v\n", err)
 		}
 
 		// always force a logout

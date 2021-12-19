@@ -39,7 +39,7 @@ func (th *TestHarness) fillInOrgInfo() {
 	if accessPolicy == "" {
 		log.Fatalf("app does not support sign-on policy or this feature is not available")
 	}
-	th.org.policyID = path.Base(accessPolicy)
+	th.org.signOnPolicy = path.Base(accessPolicy)
 	rules, _, err := th.oktaClient.Policy.ListPolicyRules(context.Background(), path.Base(accessPolicy))
 	if err != nil {
 		log.Fatalf("failed to gat app sign on policy rules: %+v", err)
@@ -48,7 +48,7 @@ func (th *TestHarness) fillInOrgInfo() {
 		if v.Name != "MFA Rule" {
 			continue
 		}
-		th.org.mfaRuleID = v.Id
+		th.org.signOnPolicyRule = v.Id
 		break
 	}
 }
@@ -171,7 +171,7 @@ func (th *TestHarness) deleteProfileFromOrg() error {
 
 func (th *TestHarness) resetAppSignOnPolicyRule() error {
 	re := th.oktaClient.CloneRequestExecutor()
-	req, err := re.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.policyID, th.org.mfaRuleID), nil)
+	req, err := re.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.signOnPolicy, th.org.signOnPolicyRule), nil)
 	if err != nil {
 		return err
 	}
@@ -181,7 +181,7 @@ func (th *TestHarness) resetAppSignOnPolicyRule() error {
 		return err
 	}
 	rule.Conditions.People.Groups.Include = []string{th.org.mfaRequiredGroupID}
-	req, err = re.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.policyID, th.org.mfaRuleID), &rule)
+	req, err = re.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.signOnPolicy, th.org.signOnPolicyRule), &rule)
 	if err != nil {
 		return err
 	}
@@ -189,10 +189,14 @@ func (th *TestHarness) resetAppSignOnPolicyRule() error {
 	if err != nil {
 		return err
 	}
-	_, err = th.oktaClient.Policy.DeactivatePolicyRule(context.Background(), th.org.policyID, th.org.mfaRuleID)
+	_, err = th.oktaClient.Policy.DeactivatePolicyRule(context.Background(), th.org.signOnPolicy, th.org.signOnPolicyRule)
 	if err != nil {
 		return fmt.Errorf("failed to deactivate policy rule: %w", err)
 	}
+	return nil
+}
+
+func (th *TestHarness) disableMFAEnrollRules() error {
 	return nil
 }
 
@@ -283,7 +287,7 @@ func (th *TestHarness) addUserToGroup(groupName string) error {
 
 func (th *TestHarness) singOnPolicyRuleGroup() error {
 	re := th.oktaClient.CloneRequestExecutor()
-	req, err := re.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.policyID, th.org.mfaRuleID), nil)
+	req, err := re.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.signOnPolicy, th.org.signOnPolicyRule), nil)
 	if err != nil {
 		return err
 	}
@@ -293,7 +297,7 @@ func (th *TestHarness) singOnPolicyRuleGroup() error {
 		return err
 	}
 	rule.Conditions.Groups.Include = []string{th.org.everyoneGroupID}
-	req, err = re.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.policyID, th.org.mfaRuleID), &rule)
+	req, err = re.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.signOnPolicy, th.org.signOnPolicyRule), &rule)
 	if err != nil {
 		return err
 	}
@@ -301,7 +305,7 @@ func (th *TestHarness) singOnPolicyRuleGroup() error {
 	if err != nil {
 		return err
 	}
-	_, err = th.oktaClient.Policy.ActivatePolicyRule(context.Background(), th.org.policyID, th.org.mfaRuleID)
+	_, err = th.oktaClient.Policy.ActivatePolicyRule(context.Background(), th.org.signOnPolicy, th.org.signOnPolicyRule)
 	if err != nil {
 		return fmt.Errorf("failed to activate policy rule: %w", err)
 	}

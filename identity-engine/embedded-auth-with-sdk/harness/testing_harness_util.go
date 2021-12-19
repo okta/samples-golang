@@ -1227,12 +1227,12 @@ func (th *TestHarness) configuredAuthenticators(key string) error {
 			}
 		}
 	}
-	_, err = th.oktaClient.Policy.ActivatePolicyRule(context.Background(), th.org.policyID, th.org.mfaRuleID)
+	_, err = th.oktaClient.Policy.ActivatePolicyRule(context.Background(), th.org.signOnPolicy, th.org.signOnPolicyRule)
 	if err != nil {
 		return fmt.Errorf("failed to activate policy rule: %w", err)
 	}
 	re := th.oktaClient.CloneRequestExecutor()
-	req, err := re.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.policyID, th.org.mfaRuleID), nil)
+	req, err := re.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.signOnPolicy, th.org.signOnPolicyRule), nil)
 	if err != nil {
 		return err
 	}
@@ -1264,13 +1264,36 @@ func (th *TestHarness) configuredAuthenticators(key string) error {
 			},
 		}
 	}
-	req, err = re.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.policyID, th.org.mfaRuleID), &rule)
+	req, err = re.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.signOnPolicy, th.org.signOnPolicyRule), &rule)
 	if err != nil {
 		return err
 	}
 	_, err = re.Do(context.Background(), req, nil)
 	if err != nil {
 		return err
+	}
+	req, err = re.NewRequest(http.MethodGet, "/api/v1/policies?type=MFA_ENROLL", nil)
+	if err != nil {
+		return err
+	}
+	var mfaEnrollPolicies []Policy
+	_, err = re.Do(context.Background(), req, &mfaEnrollPolicies)
+	if err != nil {
+		return err
+	}
+	for _, p := range mfaEnrollPolicies {
+		if p.Name != "Google Auth Required" {
+			continue
+		}
+		p.Settings.Factors.GoogleOtp.Enroll.Self = "REQUIRED"
+		req, err = re.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/policies/%s", p.Id), &p)
+		if err != nil {
+			return err
+		}
+		_, err = re.Do(context.Background(), req, nil)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
