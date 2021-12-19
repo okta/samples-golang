@@ -125,9 +125,6 @@ type UserFactorsEnrolled struct {
 }
 
 func (th *TestHarness) deleteProfileFromOrg() error {
-	if th.currentProfile == nil || th.currentProfile.UserID == "" || th.currentProfile.KeepProfile {
-		return nil
-	}
 	users, _, err := th.oktaClient.User.ListUsers(context.Background(), &query.Params{
 		Q:     "Mary",
 		Limit: 100,
@@ -152,6 +149,9 @@ func (th *TestHarness) deleteProfileFromOrg() error {
 		if err != nil && resp != nil && resp.StatusCode != http.StatusNotFound {
 			return err
 		}
+	}
+	if th.currentProfile == nil || th.currentProfile.UserID == "" || th.currentProfile.KeepProfile {
+		return nil
 	}
 	// deactivate
 	resp, err := th.oktaClient.User.DeactivateOrDeleteUser(context.Background(), th.currentProfile.UserID, nil)
