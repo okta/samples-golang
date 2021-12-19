@@ -440,6 +440,7 @@ func (s *Server) handleLoginGoogleAuthInit(w http.ResponseWriter, r *http.Reques
 	}
 	s.cache.Set("loginResponse", lr, time.Minute*5)
 	s.ViewData["QRCode"] = template.URL(lr.ContextualData().QRcode.Href)
+	s.ViewData["SharedSecret"] = template.URL(lr.ContextualData().SharedSecret)
 	s.render("loginGoogleAuthInitial.gohtml", w, r)
 }
 

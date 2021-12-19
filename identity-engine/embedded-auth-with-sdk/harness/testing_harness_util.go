@@ -18,9 +18,12 @@ package harness
 
 import (
 	"bytes"
+	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image/png"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -31,7 +34,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/liyue201/goqr"
+	"github.com/okta/okta-sdk-golang/v2/okta"
 	"github.com/tebeka/selenium"
+	"github.com/xlzd/gotp"
 )
 
 const (
@@ -281,10 +287,6 @@ func (th *TestHarness) fillsInFormValue(selector, value string, waitForForm wait
 }
 
 func (th *TestHarness) clicksFormCheckItem(selector string, waitForForm waitFor) error {
-	/*if err := waitForForm(); err != nil {
-		return err
-	}*/
-
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
 		if err != nil {
@@ -303,9 +305,17 @@ func (th *TestHarness) clicksFormCheckItem(selector string, waitForForm waitFor)
 
 func (th *TestHarness) existingUser() error {
 	th.currentProfile = &A18NProfile{
-		EmailAddress: os.Getenv("OKTA_IDX_USER_NAME"),
-		Password:     os.Getenv("OKTA_IDX_PASSWORD"),
+		Password:    os.Getenv("OKTA_IDX_PASSWORD"),
+		KeepProfile: true,
 	}
+	user, _, err := th.oktaClient.User.GetUser(context.Background(), os.Getenv("OKTA_IDX_USER_NAME"))
+	if err != nil {
+		return fmt.Errorf("failed to get user: %w", err)
+	}
+	th.currentProfile.UserID = user.Id
+	e := *user.Profile
+	th.currentProfile.EmailAddress = e["email"].(string)
+	th.currentProfile.DisplayName = e["firstName"].(string) + " " + e["lastName"].(string)
 	return nil
 }
 
@@ -774,11 +784,11 @@ func (th *TestHarness) destroyCurrentProfile() error {
 	if th.currentProfile == nil {
 		return nil
 	}
-	err := th.deleteProfileFromOrg(th.currentProfile.UserID)
+	err := th.deleteProfileFromOrg()
 	if err != nil {
 		return err
 	}
-	err = th.deleteProfile(th.currentProfile)
+	err = th.deleteProfile()
 	th.currentProfile = nil
 	return err
 }
@@ -801,6 +811,13 @@ func (th *TestHarness) selectsEmail() error {
 
 func (th *TestHarness) selectsPhone() error {
 	if err := th.clicksFormCheckItem(`input[id="push_phone"]`, th.waitForEnrollFactorForm); err != nil {
+		return err
+	}
+	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
+}
+
+func (th *TestHarness) selectsGoogleAuthenticator() error {
+	if err := th.clicksFormCheckItem(`input[id="push_google_auth"]`, th.waitForEnrollFactorForm); err != nil {
 		return err
 	}
 	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
@@ -965,11 +982,11 @@ func (th *TestHarness) latestVerificationCode(profileURL, codeType string) (stri
 	return "", nil
 }
 
-func (th *TestHarness) deleteProfile(profile *A18NProfile) error {
-	if profile.URL == "" {
+func (th *TestHarness) deleteProfile() error {
+	if th.currentProfile == nil || th.currentProfile.URL == "" {
 		return nil
 	}
-	req, err := http.NewRequest(http.MethodDelete, profile.URL, nil)
+	req, err := http.NewRequest(http.MethodDelete, th.currentProfile.URL, nil)
 	if err != nil {
 		return err
 	}
@@ -1081,4 +1098,184 @@ func (th *TestHarness) logsIntoFacebook() error {
 	}
 	err = th.clicksButton(`button[type="submit"]`)
 	return err
+}
+
+func (th *TestHarness) isNotEnrolledIn(key string) error {
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
+	re := th.oktaClient.CloneRequestExecutor()
+	req, err := re.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/users/%s/authenticatorEnrollments", th.currentProfile.UserID), nil)
+	if err != nil {
+		return err
+	}
+	var userFactors []UserFactorsEnrolled
+	_, err = re.Do(context.Background(), req, &userFactors)
+	if err != nil {
+		return fmt.Errorf("failed to get user authenticator enrollments: %w", err)
+	}
+	for _, factor := range userFactors {
+		if factor.Name != key {
+			continue
+		}
+		req, err = re.NewRequest(http.MethodDelete, fmt.Sprintf("/api/v1/users/%s/authenticatorEnrollments/%s", th.currentProfile.UserID, factor.Id), nil)
+		if err != nil {
+			return err
+		}
+		_, err = re.Do(context.Background(), req, nil)
+		if err != nil {
+			fmt.Println(th.currentProfile.UserID)
+			fmt.Println(factor.Id)
+			fmt.Println(err)
+			return fmt.Errorf("failed to remove %s authenticator enrollment: %w", key, err)
+		}
+		break
+	}
+	return nil
+}
+
+func (th *TestHarness) scansAQRCode() error {
+	var source string
+	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elem, err := th.wd.FindElement(selenium.ByCSSSelector, `img[id="qr-code"]`)
+		if err != nil {
+			return false, nil
+		}
+		source, err = elem.GetAttribute("src")
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}, defaultTimeout(), defaultInterval())
+	if err != nil {
+		return err
+	}
+	i := strings.Index(source, ",")
+	if i < 0 {
+		return errors.New("invalid QR Code")
+	}
+	dec, err := base64.StdEncoding.DecodeString(source[i+1:])
+	if err != nil {
+		return err
+	}
+	img, err := png.Decode(bytes.NewReader(dec))
+	if err != nil {
+		return fmt.Errorf("image.Decode error: %w", err)
+	}
+	qrCodes, err := goqr.Recognize(img)
+	if err != nil {
+		return fmt.Errorf("Recognize failed: %v\n", err)
+	}
+	if len(qrCodes) == 0 {
+		return errors.New("didn't recognize any QR codes")
+	}
+	otpauth, err := url.Parse(fmt.Sprintf("%s", qrCodes[0].Payload))
+	if err != nil {
+		return fmt.Errorf("failed to parse URL: %w", err)
+	}
+	th.googleAuth = gotp.NewDefaultTOTP(otpauth.Query()["secret"][0])
+	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
+}
+
+func (th *TestHarness) entersTheSharedSecretKey() error {
+	var source string
+	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elem, err := th.wd.FindElement(selenium.ByCSSSelector, `p[id="shared-secret"]`)
+		if err != nil {
+			return false, nil
+		}
+		source, err = elem.Text()
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}, defaultTimeout(), defaultInterval())
+	if err != nil {
+		return err
+	}
+	th.googleAuth = gotp.NewDefaultTOTP(source)
+	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
+}
+
+func (th *TestHarness) fillsInTheCorrectOTP() error {
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
+	if th.googleAuth == nil {
+		return errors.New("test harness doesn't have a google auth created")
+	}
+	return th.entersText(`input[name="code"]`, th.googleAuth.Now())
+}
+
+func (th *TestHarness) configuredAuthenticators(key string) error {
+	authenticators := strings.Split(key, ",")
+	m := make(map[string]struct{})
+	for i := range authenticators {
+		m[strings.TrimSpace(authenticators[i])] = struct{}{}
+	}
+	auths, _, err := th.oktaClient.Authenticator.ListAuthenticators(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to get list of authenticators: %w", err)
+	}
+	for testAuths := range m {
+		for _, auth := range auths {
+			if strings.Contains(testAuths, auth.Name) && auth.Status == "INACTIVE" {
+				_, _, err = th.oktaClient.Authenticator.ActivateAuthenticator(context.Background(), auth.Id)
+				if err != nil {
+					return fmt.Errorf("failed to enable authenticator: %w", err)
+				}
+			}
+		}
+	}
+	_, err = th.oktaClient.Policy.ActivatePolicyRule(context.Background(), th.org.policyID, th.org.mfaRuleID)
+	if err != nil {
+		return fmt.Errorf("failed to activate policy rule: %w", err)
+	}
+	re := th.oktaClient.CloneRequestExecutor()
+	req, err := re.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.policyID, th.org.mfaRuleID), nil)
+	if err != nil {
+		return err
+	}
+	var rule okta.AccessPolicyRule
+	_, err = re.Do(context.Background(), req, &rule)
+	if err != nil {
+		return err
+	}
+	if len(authenticators) > 1 {
+		rule.Actions.AppSignOn.VerificationMethod.FactorMode = "2FA"
+		rule.Actions.AppSignOn.VerificationMethod.Constraints = []*okta.AccessPolicyConstraints{
+			{
+				Knowledge: &okta.KnowledgeConstraint{
+					Types:            []string{"password"},
+					ReauthenticateIn: "PT2H",
+				},
+				Possession: &okta.PossessionConstraint{
+					DeviceBound: "REQUIRED",
+				},
+			},
+		}
+	} else {
+		rule.Actions.AppSignOn.VerificationMethod.FactorMode = "1FA"
+		rule.Actions.AppSignOn.VerificationMethod.Constraints = []*okta.AccessPolicyConstraints{
+			{
+				Knowledge: &okta.KnowledgeConstraint{
+					Types: []string{"password"},
+				},
+			},
+		}
+	}
+	req, err = re.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.policyID, th.org.mfaRuleID), &rule)
+	if err != nil {
+		return err
+	}
+	_, err = re.Do(context.Background(), req, nil)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (th *TestHarness) maybeSkip() error {
+	_ = th.clicksInputWithValue(`input[type="submit"]`, "Skip")
+	return nil
 }

@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/xlzd/gotp"
 	"log"
 	"math/rand"
 	"net/http"
@@ -52,6 +53,7 @@ type A18NProfile struct {
 	FamilyName   string
 	UserID       string
 	ErrorDesc    string `json:"errorDescription"`
+	KeepProfile  bool
 }
 
 type A18NProfiles struct {
@@ -80,8 +82,6 @@ type A18NContentSMS struct {
 	Receiver string `json:"receiver"`
 }
 
-// TODO: A18NContentVoice struct {
-
 type TestHarness struct {
 	server         *server.Server
 	wd             selenium.WebDriver
@@ -90,6 +90,7 @@ type TestHarness struct {
 	httpClient     *http.Client
 	oktaClient     *okta.Client
 	org            orgData
+	googleAuth     *gotp.TOTP
 }
 
 type orgData struct {
@@ -117,6 +118,7 @@ func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 		_, client, err := okta.NewClient(
 			context.Background(),
 			okta.WithHttpClientPtr(th.httpClient),
+			okta.WithCache(false),
 		)
 		if err != nil {
 			log.Fatalf("init test suite new client error: %+v", err)
@@ -313,4 +315,12 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`she clicks the Login with Facebook button`, th.clicksLoginWithFacebook)
 	ctx.Step(`^logs into Facebook$`, th.logsIntoFacebook)
 	ctx.Step(`app Sign On Policy MFA Rule has Everyone user's group membership`, th.singOnPolicyRuleGroup)
+
+	ctx.Step(`^configured Authenticators are: "([^"]*)"`, th.configuredAuthenticators)
+	ctx.Step(`is not enrolled in "([^"]*)"`, th.isNotEnrolledIn)
+	ctx.Step(`scans a QR Code`, th.scansAQRCode)
+	ctx.Step(`enters the shared Secret Key`, th.entersTheSharedSecretKey)
+	ctx.Step(`selects Google Authenticator`, th.selectsGoogleAuthenticator)
+	ctx.Step(`fills in the correct OTP`, th.fillsInTheCorrectOTP)
+	ctx.Step(`maybe has to skip`, th.maybeSkip)
 }

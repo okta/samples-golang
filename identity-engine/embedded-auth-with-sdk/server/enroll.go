@@ -356,6 +356,7 @@ func (s *Server) enrollGoogleAuth(w http.ResponseWriter, r *http.Request) {
 	}
 	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
 	s.ViewData["QRCode"] = template.URL(enrollResponse.ContextualData().QRcode.Href)
+	s.ViewData["SharedSecret"] = template.URL(enrollResponse.ContextualData().SharedSecret)
 	s.render("enrollGoogleAuth.gohtml", w, r)
 }
 
