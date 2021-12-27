@@ -19,11 +19,9 @@ package harness
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"image/png"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -34,8 +32,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/liyue201/goqr"
-	"github.com/okta/okta-sdk-golang/v2/okta"
+	"github.com/okta/okta-sdk-golang/v2/okta/query"
 	"github.com/tebeka/selenium"
 	"github.com/xlzd/gotp"
 )
@@ -155,44 +152,6 @@ func (th *TestHarness) waitForPageRender() error {
 	return th.seesElement(`html body h1`)
 }
 
-func (th *TestHarness) checkEntryPoints() error {
-	baseURL := fmt.Sprintf("http://%s", th.server.Address())
-	links := []struct {
-		text string
-		href string
-	}{
-		{
-			text: "Sign In",
-			href: fmt.Sprintf("%s/login", baseURL),
-		},
-		{
-			text: "Sign Up",
-			href: fmt.Sprintf("%s/register", baseURL),
-		},
-		{
-			text: "Password Recovery",
-			href: fmt.Sprintf("%s/passwordRecovery", baseURL),
-		},
-		{
-			text: "Logout",
-			href: fmt.Sprintf("%s/logout", baseURL),
-		},
-	}
-
-	for _, link := range links {
-		elem, err := th.wd.FindElement(selenium.ByLinkText, link.text)
-		if err != nil {
-			return err
-		}
-		href, err := elem.GetAttribute("href")
-		if !strings.HasSuffix(link.href, href) {
-			return fmt.Errorf("expected to find link %q with href %q but found it with %q", link.text, link.href, href)
-		}
-	}
-
-	return nil
-}
-
 func (th *TestHarness) waitForLoginForm() error {
 	return th.seesElement(`form[action="/login"]`)
 }
@@ -207,6 +166,10 @@ func (th *TestHarness) waitForRegistrationForm() error {
 
 func (th *TestHarness) waitForEnrollPasswordForm() error {
 	return th.seesElement(`form[action="/enrollPassword"]`)
+}
+
+func (th *TestHarness) waitForResetPasswordForm() error {
+	return th.seesElement(`form[action="/passwordRecovery/newPassword"]`)
 }
 
 func (th *TestHarness) waitForEnrollFactorForm() error {
@@ -238,40 +201,6 @@ func (th *TestHarness) seesClaimsTableItemAndValueFromCurrentProfile(key string)
 	return th.seesElementIDWithValue(keyID, value)
 }
 
-func (th *TestHarness) loginToApplication() error {
-	err := th.clickLink("Sign In")
-	if err != nil {
-		return err
-	}
-
-	if err = th.waitForPageRender(); err != nil {
-		return err
-	}
-
-	if err = th.waitForLoginForm(); err != nil {
-		return err
-	}
-
-	if err = th.fillsInUsername(); err != nil {
-		return err
-	}
-
-	if err = th.fillsInPassword(); err != nil {
-		return err
-	}
-
-	if err = th.submitsLoginForm(); err != nil {
-		return err
-	}
-
-	if err = th.waitForPageRender(); err != nil {
-		return err
-	}
-
-	text := fmt.Sprintf("Welcome, %s.", claimItem("name"))
-	return th.seesElementWithText(`html body h1`, text)
-}
-
 type waitFor func() error
 
 func (th *TestHarness) fillsInFormValue(selector, value string, waitForForm waitFor) error {
@@ -301,22 +230,6 @@ func (th *TestHarness) clicksFormCheckItem(selector string, waitForForm waitFor)
 	}, defaultTimeout(), defaultInterval())
 
 	return err
-}
-
-func (th *TestHarness) existingUser() error {
-	th.currentProfile = &A18NProfile{
-		Password:    os.Getenv("OKTA_IDX_PASSWORD"),
-		KeepProfile: true,
-	}
-	user, _, err := th.oktaClient.User.GetUser(context.Background(), os.Getenv("OKTA_IDX_USER_NAME"))
-	if err != nil {
-		return fmt.Errorf("failed to get user: %w", err)
-	}
-	th.currentProfile.UserID = user.Id
-	e := *user.Profile
-	th.currentProfile.EmailAddress = e["email"].(string)
-	th.currentProfile.DisplayName = e["firstName"].(string) + " " + e["lastName"].(string)
-	return nil
 }
 
 func (th *TestHarness) fillsInUsername() error {
@@ -420,21 +333,6 @@ func (th *TestHarness) seesNoAccountErrorMessage() error {
 	return th.matchErrorMessage("There is no account with the Username")
 }
 
-func (th *TestHarness) seesErrorMessage(message string) error {
-	if th.currentProfile == nil {
-		return errors.New("test harness doesn't have a current profile")
-	}
-	if strings.Contains(message, "is no account") {
-		message += " " + strings.ReplaceAll(th.currentProfile.EmailAddress, "@", "+1@") + "."
-	}
-	return th.matchErrorMessage(message)
-}
-
-func (th *TestHarness) isLoggedOut() error {
-	text := fmt.Sprintf("Welcome, %s.", claimItem("name"))
-	return th.doesNotSeeElementWithText(`html body h1`, text)
-}
-
 func (th *TestHarness) seesClaimsTable() error {
 	claims := claims()
 
@@ -471,14 +369,6 @@ func (th *TestHarness) doesntSeeClaimsTable() error {
 	}
 
 	return nil
-}
-
-func (th *TestHarness) seesLogoutButton() error {
-	return th.seesElementWithText(`button[type="submit"]`, "Logout")
-}
-
-func (th *TestHarness) clicksLogoutButton() error {
-	return th.clicksButtonWithText(`button[type="submit"]`, "Logout")
 }
 
 func (th *TestHarness) clicksForgotPasswordButton() error {
@@ -647,12 +537,12 @@ func (th *TestHarness) seesElementIDWithValue(elementID, text string) error {
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		elem, err := th.wd.FindElement(selenium.ByID, elementID)
 		if err != nil {
-			return false, nil
+			return false, err
 		}
 
 		elemText, err := elem.Text()
 		if err != nil {
-			return false, nil
+			return false, err
 		}
 
 		if strings.TrimSpace(elemText) != text {
@@ -746,7 +636,7 @@ func (th *TestHarness) fillsInTheCorrectCode() error {
 	if th.currentProfile == nil {
 		return errors.New("test harness doesn't have a current profile")
 	}
-	code, err := th.verificationCode(th.currentProfile.URL, EMAIL_CODE_TYPE)
+	code, err := th.verificationCode(th.currentProfile.URL, EmailCodeType)
 	if err != nil {
 		return fmt.Errorf("faild to find latest verification code for user %s: %v", th.currentProfile.EmailAddress, err)
 	}
@@ -758,7 +648,11 @@ func (th *TestHarness) fillsInTheIncorrectCode() error {
 }
 
 func (th *TestHarness) factorList() error {
-	return th.seesElement(`form[action="/login/factors/proceed"]`)
+	err := th.seesElement(`form[action="/login/factors/proceed"]`)
+	if err == nil {
+		return nil
+	}
+	return th.seesElement(`form[action="/enrollFactor"]`)
 }
 
 func (th *TestHarness) seesPageToSetNewPassword() error {
@@ -778,19 +672,6 @@ func (th *TestHarness) inputsIncorrectEmail() error {
 		return errors.New("test harness doesn't have a current profile")
 	}
 	return th.entersText(`input[name="identifier"]`, strings.ReplaceAll(th.currentProfile.EmailAddress, "@", "+1@"))
-}
-
-func (th *TestHarness) destroyCurrentProfile() error {
-	if th.currentProfile == nil {
-		return nil
-	}
-	err := th.deleteProfileFromOrg()
-	if err != nil {
-		return err
-	}
-	err = th.deleteProfile()
-	th.currentProfile = nil
-	return err
 }
 
 func (th *TestHarness) createCurrentProfile(name string) error {
@@ -831,7 +712,7 @@ func (th *TestHarness) fillsInTheEnrollmentCode() error {
 	if th.currentProfile == nil {
 		return errors.New("test harness doesn't have a current profile")
 	}
-	code, err := th.verificationCode(th.currentProfile.URL, EMAIL_CODE_TYPE)
+	code, err := th.verificationCode(th.currentProfile.URL, EmailCodeType)
 	if err != nil {
 		return fmt.Errorf("faild to find latest verification code for user %s: %v", th.currentProfile.ProfileID, err)
 	}
@@ -864,7 +745,7 @@ func (th *TestHarness) fillsInReceiveSMSCode() error {
 }
 
 func (th *TestHarness) fillsInTheEnrollmentCodeSMS() error {
-	code, err := th.verificationCode(th.currentProfile.URL, SMS_CODE_TYPE)
+	code, err := th.verificationCode(th.currentProfile.URL, SmsCodeType)
 	if err != nil {
 		return fmt.Errorf("faild to find latest verification code for user %s: %v", th.currentProfile.ProfileID, err)
 	}
@@ -982,11 +863,11 @@ func (th *TestHarness) latestVerificationCode(profileURL, codeType string) (stri
 	return "", nil
 }
 
-func (th *TestHarness) deleteProfile() error {
-	if th.currentProfile == nil || th.currentProfile.URL == "" {
+func (th *TestHarness) deleteProfile(profile *A18NProfile) error {
+	if profile == nil || profile.URL == "" {
 		return nil
 	}
-	req, err := http.NewRequest(http.MethodDelete, th.currentProfile.URL, nil)
+	req, err := http.NewRequest(http.MethodDelete, profile.URL, nil)
 	if err != nil {
 		return err
 	}
@@ -996,6 +877,23 @@ func (th *TestHarness) deleteProfile() error {
 		return err
 	}
 	defer resp.Body.Close()
+	return nil
+}
+
+func (th *TestHarness) deleteAllTestProfiles() error {
+	profiles, err := th.profiles()
+	if err != nil {
+		return fmt.Errorf("failed to list profiles: %w", err)
+	}
+	for _, profile := range profiles.Profiles {
+		if !strings.Contains(profile.DisplayName, "Marie") {
+			continue
+		}
+		err = th.deleteProfile(&profile)
+		if err != nil {
+			return fmt.Errorf("failed to delete test profile: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -1134,49 +1032,6 @@ func (th *TestHarness) isNotEnrolledIn(key string) error {
 	return nil
 }
 
-func (th *TestHarness) scansAQRCode() error {
-	var source string
-	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
-		elem, err := th.wd.FindElement(selenium.ByCSSSelector, `img[id="qr-code"]`)
-		if err != nil {
-			return false, nil
-		}
-		source, err = elem.GetAttribute("src")
-		if err != nil {
-			return false, err
-		}
-		return true, nil
-	}, defaultTimeout(), defaultInterval())
-	if err != nil {
-		return err
-	}
-	i := strings.Index(source, ",")
-	if i < 0 {
-		return errors.New("invalid QR Code")
-	}
-	dec, err := base64.StdEncoding.DecodeString(source[i+1:])
-	if err != nil {
-		return err
-	}
-	img, err := png.Decode(bytes.NewReader(dec))
-	if err != nil {
-		return fmt.Errorf("image.Decode error: %w", err)
-	}
-	qrCodes, err := goqr.Recognize(img)
-	if err != nil {
-		return fmt.Errorf("Recognize failed: %v\n", err)
-	}
-	if len(qrCodes) == 0 {
-		return errors.New("didn't recognize any QR codes")
-	}
-	otpauth, err := url.Parse(fmt.Sprintf("%s", qrCodes[0].Payload))
-	if err != nil {
-		return fmt.Errorf("failed to parse URL: %w", err)
-	}
-	th.googleAuth = gotp.NewDefaultTOTP(otpauth.Query()["secret"][0])
-	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
-}
-
 func (th *TestHarness) entersTheSharedSecretKey() error {
 	var source string
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
@@ -1217,82 +1072,45 @@ func (th *TestHarness) configuredAuthenticators(key string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get list of authenticators: %w", err)
 	}
+
+	var pas []PolicySettingsAuthenticator
 	for testAuths := range m {
 		for _, auth := range auths {
-			if strings.Contains(testAuths, auth.Name) && auth.Status == "INACTIVE" {
+			if !strings.Contains(testAuths, auth.Name) {
+				continue
+			}
+			if auth.Status == "INACTIVE" {
 				_, _, err = th.oktaClient.Authenticator.ActivateAuthenticator(context.Background(), auth.Id)
 				if err != nil {
 					return fmt.Errorf("failed to enable authenticator: %w", err)
 				}
 			}
+			psa := PolicySettingsAuthenticator{
+				Key:    auth.Key,
+				Enroll: PolicySettingsAuthenticatorEnroll{},
+			}
+			if strings.Contains(testAuths, "required") {
+				psa.Enroll.Self = "REQUIRED"
+			} else {
+				psa.Enroll.Self = "OPTIONAL"
+			}
+			pas = append(pas, psa)
 		}
 	}
-	_, err = th.oktaClient.Policy.ActivatePolicyRule(context.Background(), th.org.signOnPolicy, th.org.signOnPolicyRule)
-	if err != nil {
-		return fmt.Errorf("failed to activate policy rule: %w", err)
-	}
-	re := th.oktaClient.CloneRequestExecutor()
-	req, err := re.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.signOnPolicy, th.org.signOnPolicyRule), nil)
+
+	mfaPolicies, _, err := th.ListPolicies(context.Background(), &query.Params{Type: "MFA_ENROLL"})
 	if err != nil {
 		return err
 	}
-	var rule okta.AccessPolicyRule
-	_, err = re.Do(context.Background(), req, &rule)
-	if err != nil {
-		return err
-	}
-	if len(authenticators) > 1 {
-		rule.Actions.AppSignOn.VerificationMethod.FactorMode = "2FA"
-		rule.Actions.AppSignOn.VerificationMethod.Constraints = []*okta.AccessPolicyConstraints{
-			{
-				Knowledge: &okta.KnowledgeConstraint{
-					Types:            []string{"password"},
-					ReauthenticateIn: "PT2H",
-				},
-				Possession: &okta.PossessionConstraint{
-					DeviceBound: "REQUIRED",
-				},
-			},
-		}
-	} else {
-		rule.Actions.AppSignOn.VerificationMethod.FactorMode = "1FA"
-		rule.Actions.AppSignOn.VerificationMethod.Constraints = []*okta.AccessPolicyConstraints{
-			{
-				Knowledge: &okta.KnowledgeConstraint{
-					Types: []string{"password"},
-				},
-			},
-		}
-	}
-	req, err = re.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.signOnPolicy, th.org.signOnPolicyRule), &rule)
-	if err != nil {
-		return err
-	}
-	_, err = re.Do(context.Background(), req, nil)
-	if err != nil {
-		return err
-	}
-	req, err = re.NewRequest(http.MethodGet, "/api/v1/policies?type=MFA_ENROLL", nil)
-	if err != nil {
-		return err
-	}
-	var mfaEnrollPolicies []Policy
-	_, err = re.Do(context.Background(), req, &mfaEnrollPolicies)
-	if err != nil {
-		return err
-	}
-	for _, p := range mfaEnrollPolicies {
-		if p.Name != "Google Auth Required" {
+	for _, policy := range mfaPolicies {
+		if policy.Name != "Default Policy" {
 			continue
 		}
-		p.Settings.Factors.GoogleOtp.Enroll.Self = "REQUIRED"
-		req, err = re.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/policies/%s", p.Id), &p)
+		policy.Priority = 1
+		policy.Settings.Authenticators = pas
+		_, _, err = th.UpdatePolicy(context.Background(), policy.Id, policy)
 		if err != nil {
-			return err
-		}
-		_, err = re.Do(context.Background(), req, nil)
-		if err != nil {
-			return err
+			return fmt.Errorf("failed to update default MFA policy: %w", err)
 		}
 	}
 	return nil

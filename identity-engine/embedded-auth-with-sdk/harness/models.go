@@ -1,8 +1,9 @@
 package harness
 
 import (
-	"github.com/okta/okta-sdk-golang/v2/okta"
 	"time"
+
+	"github.com/okta/okta-sdk-golang/v2/okta"
 )
 
 type Policy struct {
@@ -21,11 +22,30 @@ type Policy struct {
 	Settings    *PolicySettings            `json:"settings,omitempty"`
 }
 
+type T struct {
+	Settings struct {
+		Type           string `json:"type"`
+		Authenticators []struct {
+		} `json:"authenticators"`
+	} `json:"settings"`
+}
+
 type PolicySettings struct {
-	Factors    *PolicyFactorsSettings                 `json:"factors,omitempty"`
-	Delegation *okta.PasswordPolicyDelegationSettings `json:"delegation,omitempty"`
-	Password   *PasswordPolicyPasswordSettings        `json:"password,omitempty"`
-	Recovery   *PasswordPolicyRecoverySettings        `json:"recovery,omitempty"`
+	Factors        *PolicyFactorsSettings                 `json:"factors,omitempty"`
+	Delegation     *okta.PasswordPolicyDelegationSettings `json:"delegation,omitempty"`
+	Password       *PasswordPolicyPasswordSettings        `json:"password,omitempty"`
+	Recovery       *PasswordPolicyRecoverySettings        `json:"recovery,omitempty"`
+	Type           string                                 `json:"type"`
+	Authenticators []PolicySettingsAuthenticator          `json:"authenticators"`
+}
+
+type PolicySettingsAuthenticator struct {
+	Key    string                            `json:"key"`
+	Enroll PolicySettingsAuthenticatorEnroll `json:"enroll"`
+}
+
+type PolicySettingsAuthenticatorEnroll struct {
+	Self string `json:"self"`
 }
 
 type PasswordPolicyPasswordSettings struct {
