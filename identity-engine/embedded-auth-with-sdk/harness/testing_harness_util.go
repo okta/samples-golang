@@ -962,17 +962,6 @@ type userFactor struct {
 	Profile    map[string]interface{} `json:"profile"`
 }
 
-func (th *TestHarness) facebookUser() error {
-	th.currentProfile = &A18NProfile{
-		EmailAddress: os.Getenv("OKTA_IDX_FACEBOOK_USER_NAME"),
-		Password:     os.Getenv("OKTA_IDX_FACEBOOK_USER_PASSWORD"),
-		GivenName:    "Golang",
-		FamilyName:   "User",
-		DisplayName:  "Golang SDK Test User",
-	}
-	return nil
-}
-
 func (th *TestHarness) clicksLoginWithFacebook() error {
 	return th.clicksButtonWithText(`span[class="px-4"]`, "FB IdP")
 }
@@ -985,7 +974,6 @@ func (th *TestHarness) logsIntoFacebook() error {
 	if th.currentProfile == nil {
 		return errors.New("test harness doesn't have a current profile")
 	}
-
 	err := th.fillsInFormValue(`input[name="email"]`, th.currentProfile.EmailAddress, th.waitForFacebookLoginForm)
 	if err != nil {
 		return err

@@ -8,7 +8,10 @@ import (
 	"fmt"
 	"image/png"
 	"net/url"
+	"os"
 	"strings"
+
+	"github.com/okta/okta-sdk-golang/v2/okta/query"
 
 	"github.com/cucumber/godog"
 	"github.com/liyue201/goqr"
@@ -42,11 +45,89 @@ func (th *TestHarness) steps(ctx *godog.ScenarioContext) {
 	ctx.Step(`selects (Email|Phone) factor`, th.selectsFactor)
 	ctx.Step(`submits the (Login|Recovery|New Password|Registration|Code|New Phone|Verify) form`, th.submitsTheForm)
 	ctx.Step(`she selects SMS`, th.selectSMS)
+	ctx.Step(`^logs into Facebook$`, th.logsIntoFacebook)
 
 	// Background
 	ctx.Step(`there is (existing|new) user named ([^"]*)$`, th.user)
 	ctx.Step(`^configured authenticators are: "([^"]*)"`, th.configuredAuthenticators)
+	ctx.Step(`user with Facebook account`, th.facebookUser)
+	ctx.Step(`routing rule added with (Facebook|some other) identity provider`, th.routingRule)
+}
 
+// for now only FACEBOOK is supported
+func (th *TestHarness) routingRule(provider string) error {
+	var providerID string
+	providers, _, err := th.oktaClient.IdentityProvider.ListIdentityProviders(context.TODO(), nil)
+	if err != nil {
+		return fmt.Errorf("failed to list identity providers: %w", err)
+	}
+	for _, provider := range providers {
+		if provider.Type != "FACEBOOK" {
+			continue
+		}
+		providerID = provider.Id
+		break
+	}
+	if providerID == "" {
+		return errors.New("Facebook identity provider is not configured")
+	}
+	rule := IdpDiscoveryRule{
+		Actions: &IdpDiscoveryRuleActions{
+			IDP: &IdpDiscoveryRuleIdp{
+				Providers: []*IdpDiscoveryRuleProvider{
+					{
+						Type: "OKTA",
+					},
+					{
+						ID: providerID,
+					},
+				},
+			},
+		},
+		Conditions: &IdpDiscoveryRuleConditions{
+			App: &IdpDiscoveryRuleApp{
+				Include: []*IdpDiscoveryRuleAppObj{
+					{
+						Type: "APP",
+						ID:   th.appID,
+					},
+				},
+			},
+			Network: &IdpDiscoveryRuleNetwork{
+				Connection: "ANYWHERE",
+			},
+			Platform: &IdpDiscoveryRulePlatform{
+				Include: []*IdpDiscoveryRulePlatformInclude{
+					{
+						Os: &IdpDiscoveryRulePlatformOS{
+							Type: "ANY",
+						},
+						Type: "ANY",
+					},
+				},
+			},
+		},
+		Name:        "Social IDP",
+		Type:        "IDP_DISCOVERY",
+		MultiIdpIds: true,
+	}
+	activate := true
+	_, _, err = th.CreateIdpDiscoveryRule(context.TODO(), th.org.idpDiscoveryPolicyID, rule, &query.Params{Activate: &activate})
+	if err != nil {
+		return fmt.Errorf("failed to create IdP discovery/routing rule: %w", err)
+	}
+	return nil
+}
+
+func (th *TestHarness) facebookUser() error {
+	th.currentProfile = &A18NProfile{
+		EmailAddress: os.Getenv("OKTA_IDX_FACEBOOK_USER_NAME"),
+		Password:     os.Getenv("OKTA_IDX_FACEBOOK_USER_PASSWORD"),
+		GivenName:    "Golang",
+		FamilyName:   "User",
+		DisplayName:  "Golang SDK Test User",
+	}
+	return nil
 }
 
 func (th *TestHarness) addUser(condition string) error {

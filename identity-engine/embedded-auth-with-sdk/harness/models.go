@@ -152,3 +152,120 @@ type Terms struct {
 type Enroll struct {
 	Self string `json:"self,omitempty"`
 }
+
+type (
+	IdpDiscoveryRuleActions struct {
+		IDP *IdpDiscoveryRuleIdp `json:"idp"`
+	}
+
+	IdpDiscoveryRuleApp struct {
+		Exclude []*IdpDiscoveryRuleAppObj `json:"exclude"`
+		Include []*IdpDiscoveryRuleAppObj `json:"include"`
+	}
+
+	IdpDiscoveryRuleAppObj struct {
+		Type string `json:"type,omitempty"`
+		ID   string `json:"id,omitempty"`
+		Name string `json:"name,omitempty"`
+	}
+
+	IdpDiscoveryRuleConditions struct {
+		App            *IdpDiscoveryRuleApp            `json:"app"`
+		Network        *IdpDiscoveryRuleNetwork        `json:"network"`
+		Platform       *IdpDiscoveryRulePlatform       `json:"platform,omitempty"`
+		UserIdentifier *IdpDiscoveryRuleUserIdentifier `json:"userIdentifier,omitempty"`
+	}
+
+	IdpDiscoveryRuleIdp struct {
+		Providers []*IdpDiscoveryRuleProvider `json:"providers"`
+	}
+
+	IdpDiscoveryRuleNetwork struct {
+		Connection string   `json:"connection,omitempty"`
+		Include    []string `json:"include,omitempty"`
+		Exclude    []string `json:"exclude,omitempty"`
+	}
+
+	IdpDiscoveryRulePattern struct {
+		MatchType string `json:"matchType,omitempty"`
+		Value     string `json:"value,omitempty"`
+	}
+
+	IdpDiscoveryRulePlatformOS struct {
+		Type       string `json:"type,omitempty"`
+		Expression string `json:"expression,omitempty"`
+	}
+
+	IdpDiscoveryRulePlatformInclude struct {
+		Os   *IdpDiscoveryRulePlatformOS `json:"os"`
+		Type string                      `json:"type,omitempty"`
+	}
+
+	IdpDiscoveryRulePlatform struct {
+		Exclude []interface{}                      `json:"exclude,omitempty"`
+		Include []*IdpDiscoveryRulePlatformInclude `json:"include,omitempty"`
+	}
+
+	IdpDiscoveryRuleProvider struct {
+		Type string `json:"type,omitempty"`
+		ID   string `json:"id,omitempty"`
+	}
+
+	IdpDiscoveryRuleUserIdentifier struct {
+		Attribute string                     `json:"attribute,omitempty"`
+		Patterns  []*IdpDiscoveryRulePattern `json:"patterns,omitempty"`
+		Type      string                     `json:"type,omitempty"`
+	}
+
+	IdpDiscoveryRule struct {
+		Actions     *IdpDiscoveryRuleActions    `json:"actions,omitempty"`
+		Conditions  *IdpDiscoveryRuleConditions `json:"conditions,omitempty"`
+		Created     string                      `json:"created,omitempty"`
+		ID          string                      `json:"id,omitempty"`
+		LastUpdated string                      `json:"lastUpdated,omitempty"`
+		Name        string                      `json:"name,omitempty"`
+		Priority    int                         `json:"priority,omitempty"`
+		Status      string                      `json:"status,omitempty"`
+		System      bool                        `json:"system,omitempty"`
+		Type        string                      `json:"type,omitempty"`
+		MultiIdpIds bool                        `json:"multiIdpIds"`
+	}
+)
+type T2 struct {
+	Type       string `json:"type"`
+	Name       string `json:"name"`
+	Conditions struct {
+		Network struct {
+			Connection string `json:"connection"`
+		} `json:"network"`
+		App struct {
+			Include []struct {
+				Type string `json:"type"`
+				Id   string `json:"id"`
+			} `json:"include"`
+			Exclude []interface{} `json:"exclude"`
+		} `json:"app"`
+		Platform struct {
+			Include []struct {
+				Type string `json:"type"`
+				Os   struct {
+					Type string `json:"type"`
+				} `json:"os"`
+			} `json:"include"`
+			Exclude []interface{} `json:"exclude"`
+		} `json:"platform"`
+		UserIdentifier struct {
+			Type     interface{}   `json:"type"`
+			Patterns []interface{} `json:"patterns"`
+		} `json:"userIdentifier"`
+	} `json:"conditions"`
+	Actions struct {
+		Idp struct {
+			Providers []struct {
+				Type string `json:"type,omitempty"`
+				Id   string `json:"id,omitempty"`
+			} `json:"providers"`
+		} `json:"idp"`
+	} `json:"actions"`
+	MultiIdpIds bool `json:"multiIdpIds"`
+}

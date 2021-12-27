@@ -128,6 +128,24 @@ func (th *TestHarness) ListPolicies(ctx context.Context, qp *query.Params) ([]Po
 	return policies, resp, nil
 }
 
+func (th *TestHarness) CreateIdpDiscoveryRule(ctx context.Context, policyID string, body IdpDiscoveryRule, qp *query.Params) (*IdpDiscoveryRule, *okta.Response, error) {
+	re := th.oktaClient.CloneRequestExecutor()
+	url := fmt.Sprintf("/api/v1/policies/%s/rules", policyID)
+	if qp != nil {
+		url += qp.String()
+	}
+	req, err := re.NewRequest(http.MethodPost, url, body)
+	if err != nil {
+		return nil, nil, err
+	}
+	rule := body
+	resp, err := re.Do(ctx, req, &rule)
+	if err != nil {
+		return nil, resp, err
+	}
+	return &rule, resp, err
+}
+
 // UpdatePolicy updates a policy.
 func (th *TestHarness) UpdatePolicy(ctx context.Context, policyID string, body Policy) (*Policy, *okta.Response, error) {
 	re := th.oktaClient.CloneRequestExecutor()

@@ -101,12 +101,13 @@ type authenticators struct {
 }
 
 type orgData struct {
-	appSignOnPolicy     string
-	signOnPolicyRule    string
-	mfaRequiredGroupID  string
-	everyoneGroupID     string
-	mfaEnrollPolicy     string
-	mfaEnrollPolicyRule string
+	idpDiscoveryPolicyID string
+	appSignOnPolicy      string
+	signOnPolicyRule     string
+	mfaRequiredGroupID   string
+	everyoneGroupID      string
+	mfaEnrollPolicy      string
+	mfaEnrollPolicyRule  string
 }
 
 func NewTestHarness() *TestHarness {
@@ -322,9 +323,35 @@ func (th *TestHarness) resetOrganization(ctx context.Context) error {
 			return fmt.Errorf("failed to deactivate authenticator %s: %w", authenticator.Key, err)
 		}
 	}
-	return nil
+
+	// remove all non-default IDP/routing policy rules
+	idpPolicies, _, err := th.ListPolicies(ctx, &query.Params{Type: "IDP_DISCOVERY"})
+	if err != nil {
+		return err
+	}
+	for _, idpPolicy := range idpPolicies {
+		if idpPolicy.Name != "Idp Discovery Policy" {
+			continue
+		}
+		th.org.idpDiscoveryPolicyID = idpPolicy.Id
+		rules, _, err := th.oktaClient.Policy.ListPolicyRules(ctx, idpPolicy.Id)
+		if err != nil {
+			return fmt.Errorf("failed to list policy rules: %w", err)
+		}
+		for _, rule := range rules {
+			if rule.Name == "Default Rule" {
+				continue
+			}
+			_, err = th.oktaClient.Policy.DeletePolicyRule(ctx, idpPolicy.Id, rule.Id)
+			if err != nil {
+				return fmt.Errorf("failed to delete default policy rule: %w", err)
+			}
+		}
+	}
 
 	// TODO Reset Default Password policy and policy rule
+
+	return nil
 }
 
 type testThrottledTransport struct{}
