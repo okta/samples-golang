@@ -103,9 +103,7 @@ type authenticators struct {
 type orgData struct {
 	idpDiscoveryPolicyID string
 	appSignOnPolicy      string
-	signOnPolicyRule     string
-	mfaRequiredGroupID   string
-	everyoneGroupID      string
+	appSignOnPolicyRule  string
 	mfaEnrollPolicy      string
 	mfaEnrollPolicyRule  string
 }
@@ -156,6 +154,17 @@ func (th *TestHarness) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 			log.Fatal("app does not support sign-on policy or this feature is not available")
 		}
 		th.org.appSignOnPolicy = path.Base(accessPolicy)
+
+		rules, _, err := th.ListAppSignOnPolicyRules(context.Background(), th.org.appSignOnPolicy)
+		if err != nil {
+			log.Fatalf("failed to list app sign-on policy rules: %w", err)
+		}
+		for _, rule := range rules {
+			if rule.Name == "Catch-all Rule" {
+				th.org.appSignOnPolicyRule = rule.Id
+				break
+			}
+		}
 
 		// TODO app should be assigned to everyone group
 
@@ -272,7 +281,6 @@ func (th *TestHarness) resetOrganization(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-
 	}
 
 	// remove all non-default MFA enrollment policies and and disable all eligible authenticators in default policy
@@ -404,9 +412,6 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 		if err != nil {
 			return ctx, err
 		}
-		fmt.Println()
-		fmt.Println(sc.Name)
-		fmt.Println()
 
 		return ctx, nil
 	})
@@ -432,8 +437,6 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 	})
 
 	th.steps(ctx)
-
-	ctx.Step(`sleep ([^" ]+)`, th.debugSleep)
 
 	/*ctx.Step(`Root Page shows links to the Entry Points`, th.checkEntryPoints)
 	ctx.Step(`logs in to the Application`, th.loginToApplication)

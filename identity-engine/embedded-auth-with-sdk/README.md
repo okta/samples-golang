@@ -69,8 +69,6 @@ Then run the tests in a separate shell.
 These environment variables are utilized for the test user in the selenium tests:
 
 * `OKTA_IDX_APP_NAME` - name of the application (default is "Golang IDX Web App")
-* `OKTA_IDX_USER_NAME` - The test user that the features will be run as (string)
-* `OKTA_IDX_PASSWORD` - The test users's password (string)
 * `SELENIUM_URL` - The Selenium server's URL (string)
 * `DEBUG=true` - Triggers debug loglines from the godog harness to be emitted
 * `A18N_API_URL` - REST API URL for receiving MFA verification codes

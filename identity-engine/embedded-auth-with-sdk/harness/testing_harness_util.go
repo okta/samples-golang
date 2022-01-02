@@ -18,7 +18,6 @@ package harness
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,9 +31,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/okta/okta-sdk-golang/v2/okta/query"
 	"github.com/tebeka/selenium"
-	"github.com/xlzd/gotp"
 )
 
 const (
@@ -795,16 +792,6 @@ func (th *TestHarness) submitsMethod() error {
 	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
 }
 
-func (th *TestHarness) debugSleep(amount string) error {
-	// And sleep 60s
-	d, err := time.ParseDuration(amount)
-	if err != nil {
-		return err
-	}
-	time.Sleep(d)
-	return nil
-}
-
 func (th *TestHarness) clicksVerifySMSCode() error {
 	return th.clicksButtonWithText(`button[type="submit"]`, "Submit")
 }
@@ -960,151 +947,4 @@ type userFactor struct {
 	FactorType string                 `json:"factorType"`
 	Provider   string                 `json:"provider"`
 	Profile    map[string]interface{} `json:"profile"`
-}
-
-func (th *TestHarness) clicksLoginWithFacebook() error {
-	return th.clicksButtonWithText(`span[class="px-4"]`, "FB IdP")
-}
-
-func (th *TestHarness) waitForFacebookLoginForm() error {
-	return th.seesElement(`form[id="login_form"]`)
-}
-
-func (th *TestHarness) logsIntoFacebook() error {
-	if th.currentProfile == nil {
-		return errors.New("test harness doesn't have a current profile")
-	}
-	err := th.fillsInFormValue(`input[name="email"]`, th.currentProfile.EmailAddress, th.waitForFacebookLoginForm)
-	if err != nil {
-		return err
-	}
-	err = th.fillsInFormValue(`input[name="pass"]`, th.currentProfile.Password, th.waitForFacebookLoginForm)
-	if err != nil {
-		return err
-	}
-	err = th.clicksButton(`button[type="submit"]`)
-	return err
-}
-
-func (th *TestHarness) isNotEnrolledIn(key string) error {
-	if th.currentProfile == nil {
-		return errors.New("test harness doesn't have a current profile")
-	}
-	re := th.oktaClient.CloneRequestExecutor()
-	req, err := re.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/users/%s/authenticatorEnrollments", th.currentProfile.UserID), nil)
-	if err != nil {
-		return err
-	}
-	var userFactors []UserFactorsEnrolled
-	_, err = re.Do(context.Background(), req, &userFactors)
-	if err != nil {
-		return fmt.Errorf("failed to get user authenticator enrollments: %w", err)
-	}
-	for _, factor := range userFactors {
-		if factor.Name != key {
-			continue
-		}
-		req, err = re.NewRequest(http.MethodDelete, fmt.Sprintf("/api/v1/users/%s/authenticatorEnrollments/%s", th.currentProfile.UserID, factor.Id), nil)
-		if err != nil {
-			return err
-		}
-		_, err = re.Do(context.Background(), req, nil)
-		if err != nil {
-			fmt.Println(th.currentProfile.UserID)
-			fmt.Println(factor.Id)
-			fmt.Println(err)
-			return fmt.Errorf("failed to remove %s authenticator enrollment: %w", key, err)
-		}
-		break
-	}
-	return nil
-}
-
-func (th *TestHarness) entersTheSharedSecretKey() error {
-	var source string
-	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
-		elem, err := th.wd.FindElement(selenium.ByCSSSelector, `p[id="shared-secret"]`)
-		if err != nil {
-			return false, nil
-		}
-		source, err = elem.Text()
-		if err != nil {
-			return false, err
-		}
-		return true, nil
-	}, defaultTimeout(), defaultInterval())
-	if err != nil {
-		return err
-	}
-	th.googleAuth = gotp.NewDefaultTOTP(source)
-	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
-}
-
-func (th *TestHarness) fillsInTheCorrectOTP() error {
-	if th.currentProfile == nil {
-		return errors.New("test harness doesn't have a current profile")
-	}
-	if th.googleAuth == nil {
-		return errors.New("test harness doesn't have a google auth created")
-	}
-	return th.entersText(`input[name="code"]`, th.googleAuth.Now())
-}
-
-func (th *TestHarness) configuredAuthenticators(key string) error {
-	authenticators := strings.Split(key, ",")
-	m := make(map[string]struct{})
-	for i := range authenticators {
-		m[strings.TrimSpace(authenticators[i])] = struct{}{}
-	}
-	auths, _, err := th.oktaClient.Authenticator.ListAuthenticators(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to get list of authenticators: %w", err)
-	}
-
-	var pas []PolicySettingsAuthenticator
-	for testAuths := range m {
-		for _, auth := range auths {
-			if !strings.Contains(testAuths, auth.Name) {
-				continue
-			}
-			if auth.Status == "INACTIVE" {
-				_, _, err = th.oktaClient.Authenticator.ActivateAuthenticator(context.Background(), auth.Id)
-				if err != nil {
-					return fmt.Errorf("failed to enable authenticator: %w", err)
-				}
-			}
-			psa := PolicySettingsAuthenticator{
-				Key:    auth.Key,
-				Enroll: PolicySettingsAuthenticatorEnroll{},
-			}
-			if strings.Contains(testAuths, "required") {
-				psa.Enroll.Self = "REQUIRED"
-			} else {
-				psa.Enroll.Self = "OPTIONAL"
-			}
-			pas = append(pas, psa)
-		}
-	}
-
-	mfaPolicies, _, err := th.ListPolicies(context.Background(), &query.Params{Type: "MFA_ENROLL"})
-	if err != nil {
-		return err
-	}
-	for _, policy := range mfaPolicies {
-		if policy.Name != "Default Policy" {
-			continue
-		}
-		policy.Priority = 1
-		policy.Settings.Authenticators = pas
-		_, _, err = th.UpdatePolicy(context.Background(), policy.Id, policy)
-		if err != nil {
-			return fmt.Errorf("failed to update default MFA policy: %w", err)
-		}
-	}
-	return nil
-}
-
-func (th *TestHarness) maybeSkip() error {
-	_ = th.clicksInputWithValue(`input[type="submit"]`, "Skip")
-	return nil
 }

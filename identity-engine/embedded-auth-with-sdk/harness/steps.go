@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/okta/okta-sdk-golang/v2/okta/query"
 
@@ -28,7 +29,7 @@ func (th *TestHarness) steps(ctx *godog.ScenarioContext) {
 	ctx.Step(`clicks the (Logout|Forgot Password|Login with Facebook|Skip) button`, th.clicksOnButton)
 	ctx.Step(`fills in (correct|incorrect) (username|password) to (login|recover)`, th.fillsInCredentials)
 	ctx.Step(`fills in (correct|incorrect) code from (email|sms)`, th.fillsInTheCode)
-	ctx.Step(`fills in (correct|incorrect) OTP from (Google Authenticator|WebAuthN)`, th.fillsInOTP)
+	ctx.Step(`fills in (correct|incorrect) OTP from (Google Authenticator|other) app`, th.fillsInOTP)
 	ctx.Step(`fills in new (First Name|Last Name)`, th.fillsInIdentity)
 	ctx.Step(`fills in new (valid|invalid) (email|phone number)`, th.fillsInNewEmailOrPhoneNumber)
 	ctx.Step(`fills in new password to (reset|enroll)`, th.fillsNewPassword)
@@ -37,21 +38,250 @@ func (th *TestHarness) steps(ctx *godog.ScenarioContext) {
 	ctx.Step(`logs in to the application`, th.loginToApplication)
 	ctx.Step(`navigates to the (Basic Login|Password Recovery|Root|Self Service Registration) view`, th.navigateToTheView)
 	ctx.Step(`Root Page shows links to the Entry Points`, th.checkEntryPoints)
-	ctx.Step(`scans a QR Code`, th.scansAQRCode)
+	ctx.Step(`scans a QR Code with (Google Authenticator|some other) app`, th.scansAQRCode)
+	ctx.Step(`enters the shared Secret Key to (Google Authenticator|other) app`, th.entersTheSharedSecretKey)
 	ctx.Step(`sees "([^"]*)" error message`, th.seesErrorMessage)
 	ctx.Step(`sees a list of (enrollment|verification) factors`, th.listOfFactors)
 	ctx.Step(`sees a logout button`, th.seesLogoutButton)
 	ctx.Step(`sees a page to input a code`, th.code)
-	ctx.Step(`selects (Email|Phone) factor`, th.selectsFactor)
+	ctx.Step(`selects (Email|Phone|Google Authenticator) factor`, th.selectsFactor)
 	ctx.Step(`submits the (Login|Recovery|New Password|Registration|Code|New Phone|Verify) form`, th.submitsTheForm)
 	ctx.Step(`she selects SMS`, th.selectSMS)
 	ctx.Step(`^logs into Facebook$`, th.logsIntoFacebook)
+	ctx.Step(`is enrolled in (Google Authenticator|other)`, th.isEnrolledIn)
+	ctx.Step(`maybe has to skip`, th.maybeSkip)
+	ctx.Step(`app sign-on policy requires (one|two) factors`, th.appSignOnPolicyRuleFactors)
+	ctx.Step(`sleeps for ([^" ]+)`, th.debugSleep)
 
 	// Background
 	ctx.Step(`there is (existing|new) user named ([^"]*)$`, th.user)
 	ctx.Step(`^configured authenticators are: "([^"]*)"`, th.configuredAuthenticators)
 	ctx.Step(`user with Facebook account`, th.facebookUser)
 	ctx.Step(`routing rule added with (Facebook|some other) identity provider`, th.routingRule)
+}
+
+func (th *TestHarness) debugSleep(amount string) error {
+	d, err := time.ParseDuration(amount)
+	if err != nil {
+		return err
+	}
+	time.Sleep(d)
+	return nil
+}
+
+func (th *TestHarness) appSignOnPolicyRuleFactors(f string) error {
+	if f != "two" {
+		return errors.New("only two factors are currently supported")
+	}
+	rule, _, err := th.GetAppSignOnPolicyRule(context.TODO(), th.org.appSignOnPolicy, th.org.appSignOnPolicyRule)
+	if err != nil {
+		return fmt.Errorf("failed to get app sign-on policy rule: %w", err)
+	}
+	rule.Actions.AppSignOn.VerificationMethod.FactorMode = "2FA"
+	rule.Actions.AppSignOn.VerificationMethod.Type = "ASSURANCE"
+	rule.Actions.AppSignOn.VerificationMethod.Constraints = []*okta.AccessPolicyConstraints{
+		{
+			Knowledge: &okta.KnowledgeConstraint{
+				ReauthenticateIn: "PT2H",
+				Types:            []string{"password"},
+			},
+		},
+	}
+	_, _, err = th.UpdateAppSignOnPolicyRule(context.TODO(), th.org.appSignOnPolicy, rule.Id, *rule)
+	if err != nil {
+		return fmt.Errorf("failed to update app sign-on policy rule: %w", err)
+	}
+	return nil
+}
+
+func (th *TestHarness) configuredAuthenticators(key string) error {
+	authenticators := strings.Split(key, ",")
+	m := make(map[string]struct{})
+	for i := range authenticators {
+		m[strings.TrimSpace(authenticators[i])] = struct{}{}
+	}
+	auths, _, err := th.oktaClient.Authenticator.ListAuthenticators(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to get list of authenticators: %w", err)
+	}
+
+	var pas []PolicySettingsAuthenticator
+	for testAuths := range m {
+		for _, auth := range auths {
+			if !strings.Contains(testAuths, auth.Name) {
+				continue
+			}
+			if auth.Status == "INACTIVE" {
+				_, _, err = th.oktaClient.Authenticator.ActivateAuthenticator(context.Background(), auth.Id)
+				if err != nil {
+					return fmt.Errorf("failed to enable authenticator: %w", err)
+				}
+			}
+			psa := PolicySettingsAuthenticator{
+				Key:    auth.Key,
+				Enroll: PolicySettingsAuthenticatorEnroll{},
+			}
+			if strings.Contains(testAuths, "required") {
+				psa.Enroll.Self = "REQUIRED"
+			} else {
+				psa.Enroll.Self = "OPTIONAL"
+			}
+			pas = append(pas, psa)
+		}
+	}
+
+	mfaPolicies, _, err := th.ListPolicies(context.Background(), &query.Params{Type: "MFA_ENROLL"})
+	if err != nil {
+		return err
+	}
+	for _, policy := range mfaPolicies {
+		if policy.Name != "Default Policy" {
+			continue
+		}
+		policy.Priority = 1
+		policy.Settings.Authenticators = pas
+		_, _, err = th.UpdatePolicy(context.Background(), policy.Id, policy)
+		if err != nil {
+			return fmt.Errorf("failed to update default MFA policy: %w", err)
+		}
+	}
+	return nil
+}
+
+func (th *TestHarness) maybeSkip() error {
+	_ = th.clicksInputWithValue(`input[type="submit"]`, "Skip")
+	return nil
+}
+
+func (th *TestHarness) logsIntoFacebook() error {
+	if th.currentProfile == nil {
+		return errors.New("test harness doesn't have a current profile")
+	}
+	err := th.fillsInFormValue(`input[name="email"]`, th.currentProfile.EmailAddress, th.waitForFacebookLoginForm)
+	if err != nil {
+		return err
+	}
+	err = th.fillsInFormValue(`input[name="pass"]`, th.currentProfile.Password, th.waitForFacebookLoginForm)
+	if err != nil {
+		return err
+	}
+	err = th.clicksButton(`button[type="submit"]`)
+	return err
+}
+
+func (th *TestHarness) waitForFacebookLoginForm() error {
+	return th.seesElement(`form[id="login_form"]`)
+}
+
+func (th *TestHarness) isEnrolledIn(authenticator string) error {
+	if authenticator != "Google Authenticator" {
+		return errors.New("currently only Google Authenticator is supported")
+	}
+	idxClient, err := idx.NewClient()
+	if err != nil {
+		return fmt.Errorf("new IdX client error: %w", err)
+	}
+	resp, err := idxClient.InitLogin(context.TODO())
+	if err != nil {
+		return err
+	}
+	up := &idx.IdentifyRequest{
+		Identifier: th.currentProfile.EmailAddress,
+		Credentials: idx.Credentials{
+			Password: th.currentProfile.Password,
+		},
+	}
+	if resp.HasStep(idx.LoginStepIdentify) {
+		resp, err = resp.Identify(context.TODO(), up)
+		if err != nil {
+			return err
+		}
+	} else {
+		return fmt.Errorf("failed to identify new user, expected step is %s, actual: %s", idx.LoginStepIdentify, resp.AvailableSteps())
+	}
+
+	if resp.HasStep(idx.LoginStepSetupNewPassword) {
+		newPassword := randomString()
+		resp, err = resp.SetNewPassword(context.TODO(), newPassword)
+		if err != nil {
+			return err
+		}
+		th.currentProfile.Password = newPassword
+	}
+
+	if resp.HasStep(idx.LoginStepEmailVerification) {
+		resp, err = resp.VerifyEmail(context.TODO())
+		if err != nil {
+			return err
+		}
+		if resp.HasStep(idx.LoginStepEmailConfirmation) {
+			code, err := th.verificationCode(th.currentProfile.URL, EmailCodeType)
+			if err != nil {
+				return err
+			}
+			resp, err = resp.ConfirmEmail(context.TODO(), code)
+			if err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("failed to identify new user, expected step is %s, actual: %s", idx.LoginStepEmailConfirmation, resp.AvailableSteps())
+		}
+	}
+
+	if resp.HasStep(idx.LoginStepGoogleAuthenticatorInitialVerification) {
+		resp, err = resp.GoogleAuthInitialVerify(context.TODO())
+		if err != nil {
+			return err
+		}
+		th.googleAuth = gotp.NewDefaultTOTP(resp.ContextualData().SharedSecret)
+
+		if resp.HasStep(idx.LoginStepGoogleAuthenticatorConfirmation) {
+			resp, err = resp.GoogleAuthConfirm(context.TODO(), th.googleAuth.Now())
+			if err != nil {
+				panic(err)
+			}
+		} else {
+			return fmt.Errorf("failed to identify new user, expected step is %s, actual: %s", idx.LoginStepGoogleAuthenticatorConfirmation, resp.AvailableSteps())
+		}
+	} else {
+		return fmt.Errorf("failed to identify new user, expected step is %s, actual: %s", idx.LoginStepGoogleAuthenticatorInitialVerification, resp.AvailableSteps())
+	}
+
+	if resp.HasStep(idx.LoginStepSkip) {
+		resp, err = resp.Skip(context.TODO())
+		if err != nil {
+			return err
+		}
+	}
+
+	if !resp.HasStep(idx.LoginStepSuccess) {
+		return fmt.Errorf("failed to identify new user, expected step is %s, actual: %s", idx.LoginStepSuccess, resp.AvailableSteps())
+	}
+	return nil
+}
+
+func (th *TestHarness) entersTheSharedSecretKey(app string) error {
+	var source string
+	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elem, err := th.wd.FindElement(selenium.ByCSSSelector, `p[id="shared-secret"]`)
+		if err != nil {
+			return false, nil
+		}
+		source, err = elem.Text()
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}, defaultTimeout(), defaultInterval())
+	if err != nil {
+		return err
+	}
+	if app == "Google Authenticator" {
+		th.googleAuth = gotp.NewDefaultTOTP(source)
+	} else {
+		return errors.New("currently only Google Authenticator is supported")
+	}
+	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
 }
 
 // for now only FACEBOOK is supported
@@ -295,6 +525,8 @@ func (th *TestHarness) selectsFactor(factor string) error {
 		err = th.clicksButton(`input[id="push_email"]`)
 	case "Phone":
 		err = th.clicksButton(`input[id="push_phone"]`)
+	case "Google Authenticator":
+		err = th.clicksButton(`input[id="push_google_auth"]`)
 	}
 	if err != nil {
 		return err
@@ -501,7 +733,7 @@ func (th *TestHarness) listOfFactors(factorsType string) error {
 	return errors.New("invalid factors type, should be either 'enrollment' or 'verification'")
 }
 
-func (th *TestHarness) scansAQRCode() error {
+func (th *TestHarness) scansAQRCode(app string) error {
 	var source string
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		elem, err := th.wd.FindElement(selenium.ByCSSSelector, `img[id="qr-code"]`)
@@ -521,26 +753,30 @@ func (th *TestHarness) scansAQRCode() error {
 	if i < 0 {
 		return errors.New("invalid QR Code")
 	}
-	dec, err := base64.StdEncoding.DecodeString(source[i+1:])
-	if err != nil {
-		return err
+	if app == "Google Authenticator" {
+		dec, err := base64.StdEncoding.DecodeString(source[i+1:])
+		if err != nil {
+			return err
+		}
+		img, err := png.Decode(bytes.NewReader(dec))
+		if err != nil {
+			return fmt.Errorf("image.Decode error: %w", err)
+		}
+		qrCodes, err := goqr.Recognize(img)
+		if err != nil {
+			return fmt.Errorf("Recognize failed: %v\n", err)
+		}
+		if len(qrCodes) == 0 {
+			return errors.New("didn't recognize any QR codes")
+		}
+		otpauth, err := url.Parse(fmt.Sprintf("%s", qrCodes[0].Payload))
+		if err != nil {
+			return fmt.Errorf("failed to parse URL: %w", err)
+		}
+		th.googleAuth = gotp.NewDefaultTOTP(otpauth.Query()["secret"][0])
+	} else {
+		return errors.New("only Google Authenticator is supported for now")
 	}
-	img, err := png.Decode(bytes.NewReader(dec))
-	if err != nil {
-		return fmt.Errorf("image.Decode error: %w", err)
-	}
-	qrCodes, err := goqr.Recognize(img)
-	if err != nil {
-		return fmt.Errorf("Recognize failed: %v\n", err)
-	}
-	if len(qrCodes) == 0 {
-		return errors.New("didn't recognize any QR codes")
-	}
-	otpauth, err := url.Parse(fmt.Sprintf("%s", qrCodes[0].Payload))
-	if err != nil {
-		return fmt.Errorf("failed to parse URL: %w", err)
-	}
-	th.googleAuth = gotp.NewDefaultTOTP(otpauth.Query()["secret"][0])
 	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
 }
 
@@ -560,10 +796,10 @@ func (th *TestHarness) fillsInOTP(state, source string) error {
 			return errors.New("test harness doesn't have a google auth created")
 		}
 		code = th.googleAuth.Now()
-	case "WebAuthN":
+	case "other":
 		return errors.New("not implemented")
 	default:
-		return errors.New("invalid source, should be either 'Google Authenticator' or 'WebAuthN")
+		return errors.New("invalid source, should be either 'Google Authenticator' or 'other")
 	}
 
 	return th.entersText(`input[name="code"]`, code)

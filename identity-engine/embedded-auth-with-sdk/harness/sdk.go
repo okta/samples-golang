@@ -2,7 +2,6 @@ package harness
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/okta/okta-sdk-golang/v2/okta"
 	"github.com/okta/okta-sdk-golang/v2/okta/query"
@@ -110,6 +109,21 @@ func (th *TestHarness) UpdateAppSignOnPolicyRule(ctx context.Context, policyID, 
 	return appSignOnPolicyRule, resp, nil
 }
 
+func (th *TestHarness) GetAppSignOnPolicyRule(ctx context.Context, policyID, ruleID string) (*okta.AccessPolicyRule, *okta.Response, error) {
+	re := th.oktaClient.CloneRequestExecutor()
+	url := fmt.Sprintf("/api/v1/policies/%v/rules/%s", policyID, ruleID)
+	req, err := re.WithAccept("application/json").WithContentType("application/json").NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	var appSignOnPolicyRules okta.AccessPolicyRule
+	resp, err := re.Do(ctx, req, &appSignOnPolicyRules)
+	if err != nil {
+		return nil, resp, err
+	}
+	return &appSignOnPolicyRules, resp, nil
+}
+
 func (th *TestHarness) ListPolicies(ctx context.Context, qp *query.Params) ([]Policy, *okta.Response, error) {
 	re := th.oktaClient.CloneRequestExecutor()
 	url := fmt.Sprintf("/api/v1/policies")
@@ -162,44 +176,6 @@ func (th *TestHarness) UpdatePolicy(ctx context.Context, policyID string, body P
 	return policy, resp, nil
 }
 
-func (th *TestHarness) resetAppSignOnPolicyRule() error {
-	re := th.oktaClient.CloneRequestExecutor()
-	req, err := re.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.appSignOnPolicy, th.org.signOnPolicyRule), nil)
-	if err != nil {
-		return err
-	}
-	var rule okta.AccessPolicyRule
-	_, err = re.Do(context.Background(), req, &rule)
-	if err != nil {
-		return err
-	}
-	if rule.Conditions.People.Groups != nil {
-		rule.Conditions.People.Groups.Include = []string{th.org.mfaRequiredGroupID}
-	} else {
-		rule.Conditions.People.Groups = &okta.GroupCondition{
-			Include: []string{th.org.mfaRequiredGroupID},
-		}
-	}
-
-	req, err = re.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.appSignOnPolicy, th.org.signOnPolicyRule), &rule)
-	if err != nil {
-		return err
-	}
-	_, err = re.Do(context.Background(), req, nil)
-	if err != nil {
-		return err
-	}
-	_, err = th.oktaClient.Policy.DeactivatePolicyRule(context.Background(), th.org.appSignOnPolicy, th.org.signOnPolicyRule)
-	if err != nil {
-		return fmt.Errorf("failed to deactivate policy rule: %w", err)
-	}
-	return nil
-}
-
-func (th *TestHarness) disableMFAEnrollRules() error {
-	return nil
-}
-
 func (th *TestHarness) enrollSMSFactor(uID string) error {
 	factor := []byte(fmt.Sprintf(`{
 	  "factorType": "sms",
@@ -226,53 +202,4 @@ func (th *TestHarness) enrollSMSFactor(uID string) error {
 	}
 	_, _, err = th.oktaClient.UserFactor.ActivateFactor(context.Background(), uID, uf.ID, okta.ActivateFactorRequest{PassCode: code}, nil)
 	return err
-}
-
-func (th *TestHarness) addUserToGroup(groupName string) error {
-	if th.currentProfile == nil {
-		return errors.New("test harness doesn't have a current profile")
-	}
-	// user is auto assigned to this group
-	if groupName == "Everyone" {
-		return nil
-	}
-	groups, _, err := th.oktaClient.Group.ListGroups(context.Background(), &query.Params{Q: groupName})
-	if err != nil {
-		return err
-	}
-	for _, g := range groups {
-		if g.Profile.Name != groupName {
-			continue
-		}
-		_, err = th.oktaClient.Group.AddUserToGroup(context.Background(), g.Id, th.currentProfile.UserID)
-		return err
-	}
-	return fmt.Errorf("group %s doesn't exist in the org", groupName)
-}
-
-func (th *TestHarness) singOnPolicyRuleGroup() error {
-	re := th.oktaClient.CloneRequestExecutor()
-	req, err := re.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.appSignOnPolicy, th.org.signOnPolicyRule), nil)
-	if err != nil {
-		return err
-	}
-	var rule okta.AccessPolicyRule
-	_, err = re.Do(context.Background(), req, &rule)
-	if err != nil {
-		return err
-	}
-	rule.Conditions.Groups.Include = []string{th.org.everyoneGroupID}
-	req, err = re.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/policies/%s/rules/%s", th.org.appSignOnPolicy, th.org.signOnPolicyRule), &rule)
-	if err != nil {
-		return err
-	}
-	_, err = re.Do(context.Background(), req, nil)
-	if err != nil {
-		return err
-	}
-	_, err = th.oktaClient.Policy.ActivatePolicyRule(context.Background(), th.org.appSignOnPolicy, th.org.signOnPolicyRule)
-	if err != nil {
-		return fmt.Errorf("failed to activate policy rule: %w", err)
-	}
-	return nil
 }
