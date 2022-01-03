@@ -69,6 +69,7 @@ Then run the tests in a separate shell.
 These environment variables are utilized for the test user in the selenium tests:
 
 * `OKTA_IDX_APP_NAME` - name of the application (default is "Golang IDX Web App")
+* `OKTA_IDX_CLAIMS` - Name/value JSON map of claims that will be checked (string)
 * `SELENIUM_URL` - The Selenium server's URL (string)
 * `DEBUG=true` - Triggers debug loglines from the godog harness to be emitted
 * `A18N_API_URL` - REST API URL for receiving MFA verification codes
@@ -82,8 +83,8 @@ These environment variables are utilized for the test user in the selenium tests
 # OKTA_IDX_SCOPES, OKTA_IDX_REDIRECTURI have been
 # exported into the shell or are set in the $HOME/.okta/okta.yaml file
 
-$ OKTA_IDX_USER_NAME=tester@okta.com OKTA_IDX_PASSWORD=abc123 SELENIUM_URL="http://127.0.0.1:4444/wd/hub" go test -v
+$ SELENIUM_URL="http://127.0.0.1:4444/wd/hub" go test -v
 
 # filter on cucumber tags which scenarios to run
-$ OKTA_IDX_USER_NAME=tester@okta.com OKTA_IDX_PASSWORD=abc123 SELENIUM_URL="http://127.0.0.1:4444/wd/hub" go test -v --godog.format=pretty --godog.tags=wip
+$ SELENIUM_URL="http://127.0.0.1:4444/wd/hub" go test -v --godog.format=pretty --godog.tags=wip
 ```
