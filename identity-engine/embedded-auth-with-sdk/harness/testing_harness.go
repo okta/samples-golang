@@ -307,6 +307,7 @@ func (th *TestHarness) resetOrganization(ctx context.Context) error {
 
 	for _, policy := range mfaPolicies {
 		if policy.Name == "Default Policy" {
+			policy.Settings.Type = "AUTHENTICATORS"
 			policy.Settings.Authenticators = pas
 			_, _, err = th.UpdatePolicy(ctx, policy.Id, policy)
 			if err != nil {
