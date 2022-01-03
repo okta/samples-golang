@@ -1,4 +1,4 @@
-@10.1.a @no-ci
+@10.1.a
 Feature: 10.1 TOTP Support for Login (Google Authenticator)
 
   Background:

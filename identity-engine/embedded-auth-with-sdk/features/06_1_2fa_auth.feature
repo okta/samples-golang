@@ -1,4 +1,4 @@
-@6.1 @no-ci
+@6.1
 Feature: 6.1 Multi-Factor Authentication with Password and Email
 
   Background:

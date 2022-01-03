@@ -1,4 +1,4 @@
-@4 @no-ci
+@4
 Feature: 4.1 Self Service Registration with Email Activation and optional SMS
 
   Background:
