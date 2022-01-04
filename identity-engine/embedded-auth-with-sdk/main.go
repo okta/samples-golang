@@ -23,7 +23,5 @@ import (
 
 func main() {
 	cfg := &config.Config{}
-	server := server.NewServer(cfg)
-
-	server.Run()
+	server.NewServer(cfg).Run()
 }

@@ -1,4 +1,4 @@
-@8
+@no-ci @fixme
 Feature: Basic Login with Embedded Sign In Widget
 
   Background:

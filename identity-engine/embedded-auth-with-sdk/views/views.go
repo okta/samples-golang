@@ -22,13 +22,10 @@ import (
 	"strings"
 
 	"github.com/gorilla/sessions"
-
 	idx "github.com/okta/okta-idx-golang"
 )
 
-var (
-	idxClient *idx.Client
-)
+var idxClient *idx.Client
 
 type ViewConfig struct {
 	session *sessions.CookieStore

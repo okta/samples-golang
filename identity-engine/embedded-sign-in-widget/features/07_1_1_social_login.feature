@@ -1,9 +1,10 @@
+@no-ci @fixme
 Feature: 7.1 Direct Auth with Self Hosted Sign In Widget Social Login with 1 Social IDP
 
   Background:
     Given a user with a Google account
 
-  @7.1.1 @no-ci
+  @7.1.1
   Scenario: 7.1.1 Mary Logs in with Google Social IDP
 
     Given Mary navigates to Login with Social IDP

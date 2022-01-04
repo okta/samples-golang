@@ -1,36 +1,34 @@
-@6.1 @no-ci
+@6.1 @no-ci @fixme
 Feature: 6.1 Multi-Factor Authentication with Password and Email
 
   Background:
-    Given there is a new sign up user named Mary Acme
-    And user is added to the org without phone number
-    And user is assigned to the group MFA Required
+    Given there is existing user named Marie Curie
+    And app sign-on policy requires two factors
+    And configured authenticators are: "Password (required), Email (required)"
 
   @6.1.2
   Scenario: 6.1.2 2FA Login with Email
-    Given Mary navigates to the Basic Login View
-    When she fills in her correct username
-    And she fills in her password
+    Given Marie navigates to the Basic Login view
+    When she fills in correct username to login
+    And she fills in correct password to login
     And she submits the Login form
-    Then she sees a list of factors
-    When she selects Email
-    Then she sees a page to input the code
-    When she fills in the correct code
-    And she submits the code form
-    Then she is redirected back to the Root View
-    And she sees a table with her profile info
-    And the cell for the value of "email" is shown and contains her email
-    And the cell for the value of "name" is shown and contains her first name and last name
+    Then she sees a list of verification factors
+    When she selects Email factor
+    Then she sees a page to input a code
+    When she fills in correct code from email
+    And she submits the Code form
+    Then she is redirected to the Root view
+    And Marie sees a table with profile info
 
   @6.1.3
-  Scenario: 6.1.3 Mary enters a wrong verification code
-    Given Mary navigates to the Basic Login View
-    When she fills in her correct username
-    And she fills in her password
+  Scenario: 6.1.3 Marie enters a wrong verification code
+    Given Marie navigates to the Basic Login view
+    When she fills in correct username to login
+    And she fills in correct password to login
     And she submits the Login form
-    Then she sees a list of factors
-    When she selects Email
-    Then she sees a page to input the code
-    When she fills in the incorrect code
-    And she submits the code form
-    Then she sees a message "Invalid code. Try again."
+    Then she sees a list of verification factors
+    When she selects Email factor
+    Then she sees a page to input a code
+    When she fills in incorrect code from email
+    And she submits the Code form
+    Then she sees "Invalid code. Try again." error message

@@ -2,26 +2,26 @@
 Feature: 1.1 Basic Login with Password Factor
 
   Background:
-    Given there is an existing user
+    Given there is existing user named Marie Curie
 
   @1.1.2
-  Scenario: 1.1.2 Mary doesn't know her username
-    Given Mary navigates to the Basic Login View
-    When she fills in her incorrect username
-    And she fills in her password
+  Scenario: 1.1.2 Marie doesn't know her username
+    Given Marie navigates to the Basic Login view
+    When she fills in incorrect username to login
+    And she fills in correct password to login
     And she submits the Login form
-    Then she should see an error message on the Login form "Authentication failed".
+    Then she sees "There is no account with the Username wrong_email@example.com." error message
 
   @1.1.3
-  Scenario: 1.1.3 Mary doesn't know her password
-    Given Mary navigates to the Basic Login View
-    When she fills in her correct username
-    And she fills in her incorrect password
+  Scenario: 1.1.3 Marie doesn't know her password
+    Given Marie navigates to the Basic Login view
+    When she fills in correct username to login
+    And she fills in incorrect password to login
     And she submits the Login form
-    Then she should see an error message "Authentication failed"
+    Then she sees "Authentication failed" error message
 
   @1.1.8
-  Scenario: 1.1.8 Mary clicks on the "Forgot Password Link"
-    Given Mary navigates to the Basic Login View
-    When she clicks on the Forgot Password button
-    Then she is redirected to the Self Service Password Reset View
+  Scenario: 1.1.8 Marie clicks on the "Forgot Password Link"
+    Given Marie navigates to the Basic Login view
+    When she clicks the Forgot Password button
+    Then she is redirected to the Password Recovery view
