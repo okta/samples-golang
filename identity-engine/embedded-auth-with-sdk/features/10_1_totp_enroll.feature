@@ -1,4 +1,4 @@
-@10.1.b
+@10.1.b @no-ci @todo
 Feature: 10.1 TOTP Support for Enroll (Google Authenticator)
 
   Background:

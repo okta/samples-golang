@@ -1,4 +1,4 @@
-@5.2
+@5.2 @no-ci @invalid
 Feature: 5.2 Direct Auth Social Login with MFA
 
   Background:

@@ -1,4 +1,4 @@
-@6.1
+@6.1 @no-ci @fixme
 Feature: 6.1 Multi-Factor Authentication with Password and Email
 
   Background:
