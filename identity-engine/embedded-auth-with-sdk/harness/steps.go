@@ -627,7 +627,9 @@ func (th *TestHarness) clicksOnButton(button string) error {
 	case "Logout":
 		return th.clicksButtonWithText(`button[type="submit"]`, "Logout")
 	case "Login with Facebook":
-		return th.clicksButtonWithText(`span[class="px-4"]`, "FB IdP")
+		if err := th.clicksButtonWithText(`span[class="px-4"]`, "FB IdP"); err != nil {
+			return th.clicksButtonWithText(`span[class="px-4"]`, "Facebook IdP")
+		}
 	case "Skip":
 		return th.clicksInputWithValue(`input[type="submit"]`, "Skip")
 	}
