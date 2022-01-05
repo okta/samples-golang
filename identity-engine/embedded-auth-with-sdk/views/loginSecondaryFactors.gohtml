@@ -36,6 +36,14 @@
                                                     </label>
                                                 </div>
                                             {{end}}
+                                            {{if .FactorOktaVerify}}
+                                                <div class="flex items-center">
+                                                    <input id="push_okta_verify" name="push_factor" value="push_okta_verify" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"{{if not .FactorOktaVerify}} checked{{end}}>
+                                                    <label for="push_okta_verify" class="ml-3 block text-sm font-medium text-gray-700">
+                                                        Okta Verify
+                                                    </label>
+                                                </div>
+                                            {{end}}
                                             {{if .FactorGoogleAuth}}
                                               <div class="flex items-center">
                                                 <input id="push_google_auth" name="push_factor" value="push_google_auth" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"{{if and (not .FactorEmail) (not .FactorPhone)}} checked{{end}}>

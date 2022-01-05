@@ -3,14 +3,13 @@ module github.com/okta/samples-golang/identity-engine/embedded-auth-with-sdk
 go 1.17
 
 require (
-	github.com/cenkalti/backoff/v4 v4.1.0
 	github.com/cucumber/godog v0.12.2
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/sessions v1.2.1
 	github.com/howeyc/fsnotify v0.9.0
 	github.com/liyue201/goqr v0.0.0-20200803022322-df443203d4ea
-	github.com/okta/okta-idx-golang v0.2.3-0.20211215205254-46c62ff73f2e
-	github.com/okta/okta-sdk-golang/v2 v2.9.2
+	github.com/okta/okta-idx-golang v0.2.3-0.20211221232132-bb44740105c1
+	github.com/okta/okta-sdk-golang/v2 v2.3.1-0.20210519105407-20ace51aad26
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/spf13/pflag v1.0.5
 	github.com/tebeka/selenium v0.9.9
@@ -20,6 +19,7 @@ require (
 require (
 	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
+	github.com/cenkalti/backoff/v4 v4.1.0 // indirect
 	github.com/cucumber/gherkin-go/v19 v19.0.3 // indirect
 	github.com/cucumber/messages-go/v16 v16.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.4.7 // indirect

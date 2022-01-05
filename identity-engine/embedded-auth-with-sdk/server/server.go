@@ -128,6 +128,8 @@ func (s *Server) Run() {
 	r.HandleFunc("/enrollGoogleAuth", s.enrollGoogleAuth).Methods("GET")
 	r.HandleFunc("/enrollGoogleAuth", s.handleEnrollGoogleAuthQRCode).Methods("POST")
 	r.HandleFunc("/enrollGoogleAuth/code", s.handleEnrollGoogleAuthCode).Methods("POST")
+	r.HandleFunc("/enrollOktaVerify", s.enrollOktaVerify).Methods("GET")
+	r.HandleFunc("/enrollOktaVerify", s.handleEnrollOktaVerify).Methods("POST")
 	r.HandleFunc("/enrollPhone", s.enrollPhone).Methods("GET")
 	r.HandleFunc("/enrollPhone", s.enrollPhoneMethod).Methods("POST")
 	r.HandleFunc("/enrollPhone/method", s.handleEnrollPhoneMethod).Methods("GET")

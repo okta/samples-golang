@@ -113,7 +113,6 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	s.cache.Set("loginResponse", lr, time.Minute*5)
 	http.Redirect(w, r, "/login/factors", http.StatusFound)
-	return
 }
 
 func (s *Server) handleLoginSecondaryFactors(w http.ResponseWriter, r *http.Request) {
@@ -123,6 +122,7 @@ func (s *Server) handleLoginSecondaryFactors(w http.ResponseWriter, r *http.Requ
 	s.ViewData["FactorEmail"] = lr.HasStep(idx.LoginStepEmailVerification)
 	s.ViewData["FactorPhone"] = lr.HasStep(idx.LoginStepPhoneVerification) || lr.HasStep(idx.LoginStepPhoneInitialVerification)
 	s.ViewData["FactorGoogleAuth"] = lr.HasStep(idx.LoginStepGoogleAuthenticatorInitialVerification) || lr.HasStep(idx.LoginStepGoogleAuthenticatorConfirmation)
+	s.ViewData["FactorOktaVerify"] = lr.HasStep(idx.LoginStepOktaVerify)
 	s.ViewData["FactorSkip"] = lr.HasStep(idx.LoginStepSkip)
 
 	s.render("loginSecondaryFactors.gohtml", w, r)
@@ -144,6 +144,9 @@ func (s *Server) handleLoginSecondaryFactorsProceed(w http.ResponseWriter, r *ht
 		return
 	case "push_phone":
 		http.Redirect(w, r, "/login/factors/phone/method", http.StatusFound)
+		return
+	case "push_okta_verify":
+		http.Redirect(w, r, "/login/factors/okta-verify", http.StatusFound)
 		return
 	case "push_google_auth":
 		http.Redirect(w, r, "/login/factors/google_auth", http.StatusFound)
@@ -257,6 +260,8 @@ func (s *Server) handleLoginEmailConfirmation(w http.ResponseWriter, r *http.Req
 	http.Redirect(w, r, "/login/factors", http.StatusFound)
 }
 
+// TODO handleLoginOktaVerify
+
 func (s *Server) handleLoginPhoneVerificationMethod(w http.ResponseWriter, r *http.Request) {
 	clr, _ := s.cache.Get("loginResponse")
 	lr := clr.(*idx.LoginResponse)
@@ -303,7 +308,6 @@ func (s *Server) handleLoginPhoneVerification(w http.ResponseWriter, r *http.Req
 		return
 	}
 	http.Redirect(w, r, "/login/factors", http.StatusFound)
-	return
 }
 
 func (s *Server) handleLoginPhoneConfirmation(w http.ResponseWriter, r *http.Request) {

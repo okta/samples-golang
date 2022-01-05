@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"html/template"
 	"log"
 	"net/http"
@@ -48,6 +49,7 @@ func (s *Server) enrollFactor(w http.ResponseWriter, r *http.Request) {
 	s.ViewData["FactorSkip"] = enrollResponse.HasStep(idx.EnrollmentStepSkip)
 	s.ViewData["FactorPhone"] = enrollResponse.HasStep(idx.EnrollmentStepPhoneVerification)
 	s.ViewData["FactorEmail"] = enrollResponse.HasStep(idx.EnrollmentStepEmailVerification)
+	s.ViewData["FactorOktaVerify"] = enrollResponse.HasStep(idx.EnrollmentStepOktaVerifyInit)
 	s.ViewData["FactorGoogleAuth"] = enrollResponse.HasStep(idx.EnrollmentStepGoogleAuthenticatorInit)
 
 	if !enrollResponse.HasStep(idx.EnrollmentStepPhoneVerification) &&
@@ -82,6 +84,9 @@ func (s *Server) handleEnrollFactor(w http.ResponseWriter, r *http.Request) {
 		return
 	case "push_phone":
 		http.Redirect(w, r, "/enrollPhone", http.StatusFound)
+		return
+	case "push_okta_verify":
+		http.Redirect(w, r, "/enrollOktaVerify", http.StatusFound)
 		return
 	case "push_google_auth":
 		http.Redirect(w, r, "/enrollGoogleAuth", http.StatusFound)
@@ -336,6 +341,45 @@ func (s *Server) handleEnrollEmail(w http.ResponseWriter, r *http.Request) {
 	}
 	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
 	http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+}
+
+func (s *Server) enrollOktaVerify(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepOktaVerifyInit) {
+		s.ViewData["Errors"] = "Missing enrollment step Okta Verify"
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+
+	enrollResponse, err := enrollResponse.OktaVerifyInit(r.Context(), idx.OktaVerifyOptionQRCode)
+	if err != nil {
+		log.Fatalf("okta verify error: %s", err)
+	}
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+
+	s.ViewData["QRCode"] = enrollResponse.ContextualData().QRcode.Href
+	s.render("enrollOktaVerify.gohtml", w, r)
+}
+
+func (s *Server) handleEnrollOktaVerify(w http.ResponseWriter, r *http.Request) {
+	// we don't need to poll anylonger if enrollment step enroll poll is missing  and enroll okta verify is missing
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	_, continuePolling, err := enrollResponse.OktaVerifyContinuePolling(r.Context())
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+	if err != nil {
+		log.Fatalf("okta verify confirmation error: %s", err)
+	}
+
+	data := struct {
+		ContinuePolling bool
+		Next            string
+	}{!continuePolling, "/enrollFactor"}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(data)
 }
 
 func (s *Server) enrollGoogleAuth(w http.ResponseWriter, r *http.Request) {

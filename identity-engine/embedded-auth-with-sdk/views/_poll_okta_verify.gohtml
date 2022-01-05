@@ -1,0 +1,45 @@
+{{define "_poll_okta_verify"}}
+
+<script>
+let spinner = 0;
+function ScanQRCode(elem) {
+    function showMessage(message) {
+        elem.innerHTML = message;
+    }
+
+    function spinnerChar() {
+        switch (spinner % 4) {
+            case 0:
+                return '*';
+            case 1:
+                return '\\';
+            case 2:
+                return '|';
+            case 3:
+                return '/';
+            default:
+                return '?';
+        }
+    }
+
+    function poll() {
+        fetch('/enrollOktaVerify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        }).then(response => response.json())
+        .then(data => {
+            if (data.ContinuePolling) {
+                showMessage(spinnerChar());
+                spinner++;
+                setTimeout(poll, 2000);
+            } else {
+                showMessage("redirecting");
+                window.location.href = data.Next;
+            }
+        });
+    }
+    setTimeout(poll, 1000);
+}
+</script>
+
+{{end}}
