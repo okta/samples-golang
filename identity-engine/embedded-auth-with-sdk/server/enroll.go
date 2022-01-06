@@ -46,6 +46,16 @@ func (s *Server) enrollFactor(w http.ResponseWriter, r *http.Request) {
 	cer, _ := s.cache.Get("enrollResponse")
 	enrollResponse := cer.(*idx.EnrollmentResponse)
 
+	if errors, ok := s.cache.Get("Errors"); ok {
+		s.ViewData["Errors"] = errors
+		s.cache.Delete("Errors")
+	}
+
+	if enrollResponse.EnrollmentSuccess() {
+		s.transitionToProfile(enrollResponse, w, r)
+		return
+	}
+
 	s.ViewData["FactorSkip"] = enrollResponse.HasStep(idx.EnrollmentStepSkip)
 	s.ViewData["FactorPhone"] = enrollResponse.HasStep(idx.EnrollmentStepPhoneVerification)
 	s.ViewData["FactorEmail"] = enrollResponse.HasStep(idx.EnrollmentStepEmailVerification)
@@ -54,14 +64,12 @@ func (s *Server) enrollFactor(w http.ResponseWriter, r *http.Request) {
 
 	if !enrollResponse.HasStep(idx.EnrollmentStepPhoneVerification) &&
 		!enrollResponse.HasStep(idx.EnrollmentStepEmailVerification) &&
+		!enrollResponse.HasStep(idx.EnrollmentStepOktaVerifyInit) &&
 		!enrollResponse.HasStep(idx.EnrollmentStepGoogleAuthenticatorInit) {
+
+		// implies skip
 		s.transitionToProfile(enrollResponse, w, r)
 		return
-	}
-
-	if errors, ok := s.cache.Get("Errors"); ok {
-		s.ViewData["Errors"] = errors
-		s.cache.Delete("Errors")
 	}
 
 	s.render("enroll.gohtml", w, r)
@@ -104,23 +112,29 @@ func (s *Server) transitionToProfile(er *idx.EnrollmentResponse, w http.Response
 		log.Fatalf("could not get store: %s", err)
 	}
 
-	enrollResponse, err := er.Skip(r.Context())
-	if err != nil {
-		session.Values["Errors"] = err.Error()
-		session.Save(r, w)
-		http.Redirect(w, r, "/", http.StatusFound)
-		return
+	// skip can be an option if we aren't at the conclusion of enrollment success
+	if !er.EnrollmentSuccess() {
+		er, err := er.Skip(r.Context())
+		if err != nil {
+			session.Values["Errors"] = err.Error()
+			session.Save(r, w)
+			http.Redirect(w, r, "/", http.StatusFound)
+			return
+		}
+		s.cache.Set("enrollResponse", er, time.Minute*5)
 	}
-	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
 
-	if enrollResponse.Token() != nil {
-		session.Values["access_token"] = enrollResponse.Token().AccessToken
-		session.Values["id_token"] = enrollResponse.Token().IDToken
+	if er.Token() != nil {
+		session.Values["access_token"] = er.Token().AccessToken
+		session.Values["id_token"] = er.Token().IDToken
 		err = session.Save(r, w)
 		if err != nil {
 			log.Fatalf("could not save access token: %s", err)
 		}
+	} else {
+		log.Fatal("attempting to transition to profile but no token is present")
 	}
+
 	http.Redirect(w, r, "/", http.StatusFound)
 	return
 }
@@ -375,11 +389,15 @@ func (s *Server) handleEnrollOktaVerify(w http.ResponseWriter, r *http.Request) 
 	data := struct {
 		ContinuePolling bool
 		Next            string
-	}{!continuePolling, "/enrollFactor"}
+	}{continuePolling, "/enrollFactor"}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(data)
+	resp, err := json.Marshal(data)
+	if err != nil {
+		log.Fatalf("Error happened in JSON marshal. Err: %s", err)
+	}
+	w.Write(resp)
 }
 
 func (s *Server) enrollGoogleAuth(w http.ResponseWriter, r *http.Request) {
