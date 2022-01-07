@@ -357,6 +357,68 @@ func (s *Server) handleLoginPhoneConfirmation(w http.ResponseWriter, r *http.Req
 	http.Redirect(w, r, "/login/factors", http.StatusFound)
 }
 
+func (s *Server) handleLoginOktaVerify(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	if clr == nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	lr := clr.(*idx.LoginResponse)
+	if !lr.HasStep(idx.LoginStepOktaVerify) {
+		http.Redirect(w, r, "/login/factors", http.StatusFound)
+		return
+	}
+	s.render("loginOktaVerifyCode.gohtml", w, r)
+}
+
+func (s *Server) handleLoginOktaVerifyConfirmation(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	lr := clr.(*idx.LoginResponse)
+	if !lr.HasStep(idx.LoginStepOktaVerify) {
+		http.Redirect(w, r, "/login/factors", http.StatusFound)
+		return
+	}
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+	lr, err = lr.OktaVerifyConfirm(r.Context(), r.FormValue("code"))
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login/factors/okta-verify", http.StatusFound)
+		return
+	}
+	s.cache.Set("loginResponse", lr, time.Minute*5)
+
+	// If we have tokens we have success, so lets store tokens
+	if lr.Token() != nil {
+		session, err := sessionStore.Get(r, "direct-auth")
+		if err != nil {
+			log.Fatalf("could not get store: %s", err)
+		}
+		session.Values["access_token"] = lr.Token().AccessToken
+		session.Values["id_token"] = lr.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+		// redirect the user to /profile
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+
+	lr, err = lr.WhereAmI(r.Context())
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+	s.cache.Set("loginResponse", lr, time.Minute*5)
+	http.Redirect(w, r, "/login/factors", http.StatusFound)
+}
+
 func (s *Server) handleLoginGoogleAuth(w http.ResponseWriter, r *http.Request) {
 	clr, _ := s.cache.Get("loginResponse")
 	if clr == nil {

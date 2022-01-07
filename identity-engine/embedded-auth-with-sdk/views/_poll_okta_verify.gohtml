@@ -31,7 +31,7 @@ function ScanQRCode(elem) {
             if (data.ContinuePolling) {
                 showMessage(spinnerChar());
                 spinner++;
-                setTimeout(poll, 2000);
+                setTimeout(poll, 1000);
             } else {
                 showMessage("redirecting");
                 window.location.href = data.Next;
