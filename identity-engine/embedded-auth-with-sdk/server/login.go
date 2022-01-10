@@ -119,6 +119,13 @@ func (s *Server) handleLoginSecondaryFactors(w http.ResponseWriter, r *http.Requ
 	clr, _ := s.cache.Get("loginResponse")
 	lr := clr.(*idx.LoginResponse)
 
+	// Deal with there aren't any login steps, perhaps user didn't complete enrollment.
+	if len(lr.AvailableSteps()) == 0 ||
+		(len(lr.AvailableSteps()) == 1 && lr.HasStep(idx.LoginStepCancel)) {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+
 	s.ViewData["FactorEmail"] = lr.HasStep(idx.LoginStepEmailVerification)
 	s.ViewData["FactorPhone"] = lr.HasStep(idx.LoginStepPhoneVerification) || lr.HasStep(idx.LoginStepPhoneInitialVerification)
 	s.ViewData["FactorGoogleAuth"] = lr.HasStep(idx.LoginStepGoogleAuthenticatorInitialVerification) || lr.HasStep(idx.LoginStepGoogleAuthenticatorConfirmation)
