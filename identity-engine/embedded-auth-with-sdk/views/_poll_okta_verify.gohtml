@@ -2,38 +2,38 @@
 
 <script>
 let spinner = 0;
+function spinnerChar() {
+    switch (spinner % 4) {
+        case 0:
+            return '*';
+        case 1:
+            return '\\';
+        case 2:
+            return '|';
+        case 3:
+            return '/';
+        default:
+            return '?';
+    }
+}
+
+function showMessage(elem, message) {
+    elem.innerHTML = message;
+}
+
 function ScanQRCode(elem) {
-    function showMessage(message) {
-        elem.innerHTML = message;
-    }
-
-    function spinnerChar() {
-        switch (spinner % 4) {
-            case 0:
-                return '*';
-            case 1:
-                return '\\';
-            case 2:
-                return '|';
-            case 3:
-                return '/';
-            default:
-                return '?';
-        }
-    }
-
     function poll() {
-        fetch('/enrollOktaVerify/qr', {
+        fetch('/enrollOktaVerify/qr/poll', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         }).then(response => response.json())
         .then(data => {
             if (data.ContinuePolling) {
-                showMessage(spinnerChar());
+                showMessage(elem, spinnerChar());
                 spinner++;
                 setTimeout(poll, 1000);
             } else {
-                showMessage("redirecting");
+                showMessage(elem, "redirecting");
                 window.location.href = data.Next;
             }
         });
@@ -42,51 +42,69 @@ function ScanQRCode(elem) {
 }
 
 function EnrollSMSCode(elem, form) {
-
-    function showMessage(message) {
-        var waiting = document.getElementById('waiting');
-        waiting.innerHTML = message;
-    }
-
-    function spinnerChar() {
-        switch (spinner % 4) {
-            case 0:
-                return '*';
-            case 1:
-                return '\\';
-            case 2:
-                return '|';
-            case 3:
-                return '/';
-            default:
-                return '?';
-        }
-    }
-
     function poll() {
-        fetch('/enrollOktaVerify/sms', {
+        fetch('/enrollOktaVerify/sms/poll', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         }).then(response => response.json())
         .then(data => {
+            var waiting = document.getElementById('waiting');
             if (data.ContinuePolling) {
-                showMessage(spinnerChar());
+                showMessage(waiting, spinnerChar());
                 spinner++;
                 setTimeout(poll, 1000);
             } else {
-                showMessage("redirecting");
+                showMessage(waiting, "redirecting");
                 window.location.href = data.Next;
             }
         });
     }
 
     var data = {};
-    var number = form.elements["mobile"].value;
-    data["mobile"] = number;
-    var message = "We sent a SMS to " + number + " with an Okta Verify setup link. To continue, open the link on your mobile device.";
+    var phoneNumber = form.elements["phoneNumber"].value;
+    data["phoneNumber"] = phoneNumber;
+    var message = "We sent a SMS to " + phoneNumber + " with an Okta Verify setup link. ";
+    message += "To continue, open the link on your mobile device. ";
+    message += "This page will redirect to your profile once Okta Verify enrollment is complete.";
     elem.innerHTML = message;
     
     fetch('/enrollOktaVerify/sms/number', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    }).then(response => {
+        setTimeout(poll, 1000);
+    });
+}
+
+function EnrollEmailCode(elem, form) {
+    function poll() {
+        fetch('/enrollOktaVerify/email/poll', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        }).then(response => response.json())
+        .then(data => {
+            var waiting = document.getElementById('waiting');
+            if (data.ContinuePolling) {
+                showMessage(waiting, spinnerChar());
+                spinner++;
+                setTimeout(poll, 1000);
+            } else {
+                showMessage(waiting, "redirecting");
+                window.location.href = data.Next;
+            }
+        });
+    }
+
+    var data = {};
+    var email = form.elements["email"].value;
+    data["email"] = email;
+    var message = "We sent an Email to " + email + " with an Okta Verify setup link.";
+    message += "To continue, open the link in your email. ";
+    message += "This page will redirect to your profile once Okta Verify enrollment is complete.";
+    elem.innerHTML = message;
+    
+    fetch('/enrollOktaVerify/email/address', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
