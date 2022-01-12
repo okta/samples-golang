@@ -122,7 +122,6 @@ func (s *Server) Run() {
 
 	r.HandleFunc("/register", s.register).Methods("GET")
 	r.HandleFunc("/register", s.handleRegister).Methods("POST")
-
 	r.HandleFunc("/enrollFactor", s.enrollFactor).Methods("GET")
 	r.HandleFunc("/enrollFactor", s.handleEnrollFactor).Methods("POST")
 	r.HandleFunc("/enrollEmail", s.enrollEmail).Methods("GET")
@@ -131,7 +130,11 @@ func (s *Server) Run() {
 	r.HandleFunc("/enrollGoogleAuth", s.handleEnrollGoogleAuthQRCode).Methods("POST")
 	r.HandleFunc("/enrollGoogleAuth/code", s.handleEnrollGoogleAuthCode).Methods("POST")
 	r.HandleFunc("/enrollOktaVerify", s.enrollOktaVerify).Methods("GET")
-	r.HandleFunc("/enrollOktaVerify", s.handleEnrollOktaVerify).Methods("POST")
+	r.HandleFunc("/enrollOktaVerify/qr", s.enrollOktaVerifyQR).Methods("GET")
+	r.HandleFunc("/enrollOktaVerify/qr", s.handleEnrollOktaVerifyQR).Methods("POST")
+	r.HandleFunc("/enrollOktaVerify/sms", s.enrollOktaVerifySMS).Methods("GET")
+	r.HandleFunc("/enrollOktaVerify/sms/number", s.handleEnrollOktaVerifySMSNumber).Methods("POST")
+	r.HandleFunc("/enrollOktaVerify/sms", s.handleEnrollOktaVerifySMS).Methods("POST")
 	r.HandleFunc("/enrollPhone", s.enrollPhone).Methods("GET")
 	r.HandleFunc("/enrollPhone", s.enrollPhoneMethod).Methods("POST")
 	r.HandleFunc("/enrollPhone/method", s.handleEnrollPhoneMethod).Methods("GET")
