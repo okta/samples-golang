@@ -9,13 +9,13 @@
               <div class="rounded-lg bg-white overflow-hidden shadow">
                 <div class="p-6">
                   <h1 class="text-4xl pb-4">Okta Verify Enrollment</h1>
-                  <div>Enroll Okta Verify with SMS text sent to your mobile device.</div>
-                  <div id="mobile-input">
-                    <form onsubmit="new EnrollSMSCode(document.getElementById('mobile-input'), this);">
+                  <div>Enroll Okta Verify with mail sent to your email address.</div>
+                  <div id="email-input">
+                    <form onsubmit="new EnrollEmailCode(document.getElementById('email-input'), this);">
                       <div>
-                        <label for="phoneNumber">Enter your mobile number:</label>
+                        <label for="email">Enter your email address:</label>
                         <div class="mt-1">
-                          <input type="tel" id="phoneNumber" name="phoneNumber" class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                          <input type="tel" id="email" name="email" class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                         </div>
                       </div>
                       <div></div>
