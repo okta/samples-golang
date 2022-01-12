@@ -23,7 +23,7 @@ function ScanQRCode(elem) {
     }
 
     function poll() {
-        fetch('/enrollOktaVerify', {
+        fetch('/enrollOktaVerify/qr', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         }).then(response => response.json())
@@ -39,6 +39,60 @@ function ScanQRCode(elem) {
         });
     }
     setTimeout(poll, 1000);
+}
+
+function EnrollSMSCode(elem, form) {
+
+    function showMessage(message) {
+        var waiting = document.getElementById('waiting');
+        waiting.innerHTML = message;
+    }
+
+    function spinnerChar() {
+        switch (spinner % 4) {
+            case 0:
+                return '*';
+            case 1:
+                return '\\';
+            case 2:
+                return '|';
+            case 3:
+                return '/';
+            default:
+                return '?';
+        }
+    }
+
+    function poll() {
+        fetch('/enrollOktaVerify/sms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        }).then(response => response.json())
+        .then(data => {
+            if (data.ContinuePolling) {
+                showMessage(spinnerChar());
+                spinner++;
+                setTimeout(poll, 1000);
+            } else {
+                showMessage("redirecting");
+                window.location.href = data.Next;
+            }
+        });
+    }
+
+    var data = {};
+    var number = form.elements["mobile"].value;
+    data["mobile"] = number;
+    var message = "We sent a SMS to " + number + " with an Okta Verify setup link. To continue, open the link on your mobile device.";
+    elem.innerHTML = message;
+    
+    fetch('/enrollOktaVerify/sms/number', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    }).then(response => {
+        setTimeout(poll, 1000);
+    });
 }
 </script>
 

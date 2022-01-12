@@ -366,6 +366,18 @@ func (s *Server) enrollOktaVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.render("enrollOktaVerify.gohtml", w, r)
+}
+
+func (s *Server) enrollOktaVerifyQR(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepOktaVerifyInit) {
+		s.ViewData["Errors"] = "Missing enrollment step Okta Verify"
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+
 	enrollResponse, err := enrollResponse.OktaVerifyInit(r.Context(), idx.OktaVerifyOptionQRCode)
 	if err != nil {
 		log.Fatalf("okta verify error: %s", err)
@@ -373,10 +385,77 @@ func (s *Server) enrollOktaVerify(w http.ResponseWriter, r *http.Request) {
 	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
 
 	s.ViewData["QRCode"] = enrollResponse.ContextualData().QRcode.Href
-	s.render("enrollOktaVerify.gohtml", w, r)
+	s.render("enrollOktaVerifyQR.gohtml", w, r)
 }
 
-func (s *Server) handleEnrollOktaVerify(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleEnrollOktaVerifyQR(w http.ResponseWriter, r *http.Request) {
+	// we don't need to poll anylonger if enrollment step enroll poll is missing  and enroll okta verify is missing
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	_, continuePolling, err := enrollResponse.OktaVerifyContinuePolling(r.Context())
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+	if err != nil {
+		log.Fatalf("okta verify confirmation error: %s", err)
+	}
+
+	data := struct {
+		ContinuePolling bool
+		Next            string
+	}{continuePolling, "/enrollFactor"}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	resp, err := json.Marshal(data)
+	if err != nil {
+		log.Fatalf("Error happened in JSON marshal. Err: %s", err)
+	}
+	w.Write(resp)
+}
+
+func (s *Server) enrollOktaVerifySMS(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepOktaVerifyInit) {
+		s.ViewData["Errors"] = "Missing enrollment step Okta Verify"
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+
+	s.render("enrollOktaVerifySMS.gohtml", w, r)
+}
+
+func (s *Server) handleEnrollOktaVerifySMSNumber(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepOktaVerifyInit) {
+		s.ViewData["Errors"] = "Missing enrollment step Okta Verify"
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+
+	var data map[string]interface{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&data)
+	if err != nil {
+		panic(err)
+	}
+	phoneNumber, found := data["mobile"]
+	if !found {
+		panic(data)
+	}
+
+	enrollResponse, err = enrollResponse.OktaVerifySMSInit(r.Context(), idx.OktaVerifyOptionSms, phoneNumber.(string))
+	if err != nil {
+		log.Fatalf("okta verify error: %s", err)
+	}
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleEnrollOktaVerifySMS(w http.ResponseWriter, r *http.Request) {
 	// we don't need to poll anylonger if enrollment step enroll poll is missing  and enroll okta verify is missing
 	cer, _ := s.cache.Get("enrollResponse")
 	enrollResponse := cer.(*idx.EnrollmentResponse)

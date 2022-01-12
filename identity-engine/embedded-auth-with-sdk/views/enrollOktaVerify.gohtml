@@ -1,0 +1,41 @@
+{{template "_head"}}
+
+    <!-- CONTENT -->
+    <main class="-mt-24 pb-8">
+      <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:max-w-7xl lg:px-8">
+        <div class="grid grid-cols-1 gap-4 items-start lg:grid-cols-3 lg:gap-8">
+          <div class="grid grid-cols-1 gap-4 lg:col-span-2">
+            <section>
+              <div class="rounded-lg bg-white overflow-hidden shadow">
+                <div class="p-6">
+
+                  <h1 class="text-4xl pb-4">Okta Verify Enrollment</h1>
+
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <a href="/enrollOktaVerify/qr" class="font-medium text-indigo-600 hover:text-indigo-500">
+                        Enroll by QR code scan with Okta Verify Application
+                      </a>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <a href="/enrollOktaVerify/sms" class="font-medium text-indigo-600 hover:text-indigo-500">
+                        Enroll with text/SMS message
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          {{template "_serverConfig"}}
+
+        </div>
+      </div>
+    </main>
+    <!-- END CONTENT -->
+
+{{template "_footer"}}
