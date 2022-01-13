@@ -128,6 +128,9 @@ func (s *Server) Run() {
 	r.HandleFunc("/enrollGoogleAuth", s.enrollGoogleAuth).Methods("GET")
 	r.HandleFunc("/enrollGoogleAuth", s.handleEnrollGoogleAuthQRCode).Methods("POST")
 	r.HandleFunc("/enrollGoogleAuth/code", s.handleEnrollGoogleAuthCode).Methods("POST")
+	r.HandleFunc("/enrollWebAuthN", s.enrollWebAuthN).Methods("GET")
+	r.HandleFunc("/enrollWebAuthN", s.handleEnrollWebAuthN).Methods("POST")
+
 	r.HandleFunc("/enrollPhone", s.enrollPhone).Methods("GET")
 	r.HandleFunc("/enrollPhone", s.enrollPhoneMethod).Methods("POST")
 	r.HandleFunc("/enrollPhone/method", s.handleEnrollPhoneMethod).Methods("GET")
@@ -175,8 +178,8 @@ func (s *Server) Run() {
 	srv := &http.Server{
 		Handler:      r,
 		Addr:         addr,
-		WriteTimeout: 15 * time.Second,
-		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 60 * time.Second,
+		ReadTimeout:  60 * time.Second,
 		ErrorLog:     logger,
 	}
 
@@ -278,6 +281,7 @@ func (s *Server) render(t string, w http.ResponseWriter, r *http.Request) {
 	s.ViewData["Authenticated"] = s.IsAuthenticated(r)
 
 	if session.Values["Errors"] != nil {
+		log.Printf("ERROR: %s", session.Values["Errors"])
 		s.ViewData["Errors"] = session.Values["Errors"]
 		delete(session.Values, "Errors")
 		session.Save(r, w)

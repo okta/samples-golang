@@ -38,14 +38,22 @@
                               </label>
                             </div>
                           {{end}}
-                            {{if .FactorGoogleAuth}}
-                              <div class="flex items-center">
-                                <input id="push_google_auth" name="push_factor" value="push_google_auth" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"{{if not .FactorEmail}} checked{{end}}>
-                                <label for="push_google_auth" class="ml-3 block text-sm font-medium text-gray-700">
-                                  Google Authenticator
-                                </label>
-                              </div>
-                            {{end}}
+                          {{if .FactorGoogleAuth}}
+                            <div class="flex items-center">
+                              <input id="push_google_auth" name="push_factor" value="push_google_auth" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"{{if not .FactorEmail}} checked{{end}}>
+                              <label for="push_google_auth" class="ml-3 block text-sm font-medium text-gray-700">
+                                Google Authenticator
+                              </label>
+                            </div>
+                          {{end}}
+                          {{if .FactorWebAuthN}}
+                            <div class="flex items-center">
+                              <input id="push_web_authn" name="push_factor" value="push_web_authn" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"{{if not .FactorEmail}} checked{{end}}>
+                              <label for="push_web_authn" class="ml-3 block text-sm font-medium text-gray-700">
+                                Security Key or Biometric
+                              </label>
+                            </div>
+                          {{end}}
                         </div>
                       </div>
                     </div>
