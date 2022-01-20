@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -119,11 +120,27 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleLoginSecondaryFactors(w http.ResponseWriter, r *http.Request) {
 	clr, _ := s.cache.Get("loginResponse")
 	lr := clr.(*idx.LoginResponse)
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+	// If we have tokens we have success, so lets store tokens
+	if lr.Token() != nil {
+		session.Values["access_token"] = lr.Token().AccessToken
+		session.Values["id_token"] = lr.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
 
 	s.ViewData["FactorEmail"] = lr.HasStep(idx.LoginStepEmailVerification)
 	s.ViewData["FactorPhone"] = lr.HasStep(idx.LoginStepPhoneVerification) || lr.HasStep(idx.LoginStepPhoneInitialVerification)
 	s.ViewData["FactorGoogleAuth"] = lr.HasStep(idx.LoginStepGoogleAuthenticatorInitialVerification) || lr.HasStep(idx.LoginStepGoogleAuthenticatorConfirmation)
 	s.ViewData["FactorSkip"] = lr.HasStep(idx.LoginStepSkip)
+	s.ViewData["FactorWebAuthN"] = lr.HasStep(idx.LoginStepWebAuthNSetup) || lr.HasStep(idx.LoginStepWebAuthNChallenge)
 
 	s.render("loginSecondaryFactors.gohtml", w, r)
 }
@@ -147,6 +164,9 @@ func (s *Server) handleLoginSecondaryFactorsProceed(w http.ResponseWriter, r *ht
 		return
 	case "push_google_auth":
 		http.Redirect(w, r, "/login/factors/google_auth", http.StatusFound)
+		return
+	case "push_web_authn":
+		http.Redirect(w, r, "/login/factors/web_authn", http.StatusFound)
 		return
 	}
 	http.Redirect(w, r, "/login/factors", http.StatusFound)
@@ -442,6 +462,90 @@ func (s *Server) handleLoginGoogleAuthInit(w http.ResponseWriter, r *http.Reques
 	s.ViewData["QRCode"] = template.URL(lr.ContextualData().QRcode.Href)
 	s.ViewData["SharedSecret"] = template.URL(lr.ContextualData().SharedSecret)
 	s.render("loginGoogleAuthInitial.gohtml", w, r)
+}
+
+func (s *Server) handleLoginWebAuthNChallenge(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	if clr == nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	lr := clr.(*idx.LoginResponse)
+	if !lr.HasStep(idx.LoginStepWebAuthNSetup) && !lr.HasStep(idx.LoginStepWebAuthNChallenge) {
+		http.Redirect(w, r, "/login/factors", http.StatusFound)
+		return
+	}
+	if lr.HasStep(idx.LoginStepWebAuthNChallenge) {
+		lr, err := lr.WebAuthNChallenge(r.Context())
+		if err != nil {
+			http.Redirect(w, r, "/login/factors", http.StatusFound)
+			return
+		}
+		s.cache.Set("loginResponse", lr, time.Minute*5)
+
+		s.ViewData["Challenge"] = template.URL(lr.ContextualData().ChallengeData.Challenge)
+		s.ViewData["WebauthnCredentialID"] = template.URL(lr.ContextualData().ChallengeData.CredentialID)
+		s.render("loginWebAuthN.gohtml", w, r)
+		return
+	}
+	if lr.HasStep(idx.LoginStepWebAuthNSetup) {
+		panic("not implemented yet")
+		return
+	}
+	http.Redirect(w, r, "/login/factors", http.StatusFound)
+}
+
+func (s *Server) handleLoginWebAuthNVerify(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	if clr == nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	lr := clr.(*idx.LoginResponse)
+	if !lr.HasStep(idx.LoginStepWebAuthNVerify) {
+		http.Redirect(w, r, "/login/factors", http.StatusFound)
+		return
+	}
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+	reqBody, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Fatalf("could not read request body: %v", err)
+	}
+	defer r.Body.Close()
+	var credentials idx.WebAuthNChallengeCredentials
+	if err := json.Unmarshal(reqBody, &credentials); err != nil {
+		log.Fatalf("could not unmarshal request body: %v", err)
+	}
+	lr, err = lr.WebAuthNVerify(r.Context(), &credentials)
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login/factors/web_authn", http.StatusFound)
+		return
+	}
+	// If we have tokens we have success, so lets store tokens
+	if lr.Token() != nil {
+		session.Values["access_token"] = lr.Token().AccessToken
+		session.Values["id_token"] = lr.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	lr, err = lr.WhereAmI(r.Context())
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+	s.cache.Set("loginResponse", lr, time.Minute*5)
+	http.Redirect(w, r, "/login/factors", http.StatusFound)
 }
 
 func (s *Server) handleLoginCallback(w http.ResponseWriter, r *http.Request) {

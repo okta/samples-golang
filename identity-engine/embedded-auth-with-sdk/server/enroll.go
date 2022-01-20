@@ -105,19 +105,19 @@ func (s *Server) transitionToProfile(er *idx.EnrollmentResponse, w http.Response
 	if err != nil {
 		log.Fatalf("could not get store: %s", err)
 	}
-
-	enrollResponse, err := er.Skip(r.Context())
-	if err != nil {
-		session.Values["Errors"] = err.Error()
-		session.Save(r, w)
-		http.Redirect(w, r, "/", http.StatusFound)
-		return
+	if er.HasStep(idx.EnrollmentStepSkip) {
+		er, err = er.Skip(r.Context())
+		if err != nil {
+			session.Values["Errors"] = err.Error()
+			session.Save(r, w)
+			http.Redirect(w, r, "/", http.StatusFound)
+			return
+		}
 	}
-	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
 
-	if enrollResponse.Token() != nil {
-		session.Values["access_token"] = enrollResponse.Token().AccessToken
-		session.Values["id_token"] = enrollResponse.Token().IDToken
+	if er.Token() != nil {
+		session.Values["access_token"] = er.Token().AccessToken
+		session.Values["id_token"] = er.Token().IDToken
 		err = session.Save(r, w)
 		if err != nil {
 			log.Fatalf("could not save access token: %s", err)
@@ -414,7 +414,7 @@ func (s *Server) handleEnrollWebAuthN(w http.ResponseWriter, r *http.Request) {
 		log.Fatalf("could not read request body: %v", err)
 	}
 	defer r.Body.Close()
-	var credentials idx.WebAuthNCredentials
+	var credentials idx.WebAuthNVerifyCredentials
 	if err := json.Unmarshal(reqBody, &credentials); err != nil {
 		log.Fatalf("could not unmarshal request body: %v", err)
 	}

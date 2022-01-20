@@ -4,11 +4,12 @@ go 1.17
 
 require (
 	github.com/cucumber/godog v0.12.2
+	github.com/gorilla/handlers v1.5.1
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/sessions v1.2.1
 	github.com/howeyc/fsnotify v0.9.0
 	github.com/liyue201/goqr v0.0.0-20200803022322-df443203d4ea
-	github.com/okta/okta-idx-golang v0.2.3-0.20220111183407-d90761c64289
+	github.com/okta/okta-idx-golang v0.2.3-0.20220120165629-1990461ec34d
 	github.com/okta/okta-sdk-golang/v2 v2.9.2
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/spf13/pflag v1.0.5
@@ -22,6 +23,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.1.0 // indirect
 	github.com/cucumber/gherkin-go/v19 v19.0.3 // indirect
 	github.com/cucumber/messages-go/v16 v16.0.1 // indirect
+	github.com/felixge/httpsnoop v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.4.7 // indirect
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0 // indirect
 	github.com/goccy/go-json v0.3.5 // indirect
