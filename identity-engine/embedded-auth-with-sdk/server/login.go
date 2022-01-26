@@ -122,6 +122,10 @@ func (s *Server) handleLoginSecondaryFactors(w http.ResponseWriter, r *http.Requ
 	// Deal with there aren't any login steps, perhaps user didn't complete enrollment.
 	if len(lr.AvailableSteps()) == 0 ||
 		(len(lr.AvailableSteps()) == 1 && lr.HasStep(idx.LoginStepCancel)) {
+		session, err := sessionStore.Get(r, "direct-auth")
+		if err == nil {
+			session.Values["Errors"] = "There should be should be additional login factors available but they are not."
+		}
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
@@ -267,8 +271,6 @@ func (s *Server) handleLoginEmailConfirmation(w http.ResponseWriter, r *http.Req
 	http.Redirect(w, r, "/login/factors", http.StatusFound)
 }
 
-// TODO handleLoginOktaVerify
-
 func (s *Server) handleLoginPhoneVerificationMethod(w http.ResponseWriter, r *http.Request) {
 	clr, _ := s.cache.Get("loginResponse")
 	lr := clr.(*idx.LoginResponse)
@@ -375,10 +377,39 @@ func (s *Server) handleLoginOktaVerify(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login/factors", http.StatusFound)
 		return
 	}
-	s.render("loginOktaVerifyCode.gohtml", w, r)
+
+	s.ViewData["OktaVerifyTotp"] = false
+	s.ViewData["OktaVerifyPush"] = false
+	methodTypes, err := lr.OktaVerifyMethodTypes(r.Context())
+	if err == nil {
+		for _, mt := range methodTypes {
+			switch mt {
+			case "push":
+				s.ViewData["OktaVerifyPush"] = true
+			case "totp":
+				s.ViewData["OktaVerifyTotp"] = true
+			}
+		}
+	}
+
+	s.render("loginOktaVerify.gohtml", w, r)
 }
 
-func (s *Server) handleLoginOktaVerifyConfirmation(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleLoginOktaVerifyTotp(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	if clr == nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	lr := clr.(*idx.LoginResponse)
+	if !lr.HasStep(idx.LoginStepOktaVerify) {
+		http.Redirect(w, r, "/login/factors", http.StatusFound)
+		return
+	}
+	s.render("loginOktaVerifyTotp.gohtml", w, r)
+}
+
+func (s *Server) handleLoginOktaVerifyTotpConfirmation(w http.ResponseWriter, r *http.Request) {
 	clr, _ := s.cache.Get("loginResponse")
 	lr := clr.(*idx.LoginResponse)
 	if !lr.HasStep(idx.LoginStepOktaVerify) {
@@ -423,6 +454,46 @@ func (s *Server) handleLoginOktaVerifyConfirmation(w http.ResponseWriter, r *htt
 		return
 	}
 	s.cache.Set("loginResponse", lr, time.Minute*5)
+	http.Redirect(w, r, "/login/factors", http.StatusFound)
+}
+
+func (s *Server) handleLoginOktaVerifyPush(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	if clr == nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	lr := clr.(*idx.LoginResponse)
+	if !lr.HasStep(idx.LoginStepOktaVerify) {
+		http.Redirect(w, r, "/login/factors", http.StatusFound)
+		return
+	}
+
+	// will block while push login notice sent to remote Okta Verify app
+	lr, err := lr.OktaVerify(r.Context())
+	if err != nil {
+		log.Fatalf("error initiating okta verify async: %s", err)
+	}
+
+	s.cache.Set("loginResponse", lr, time.Minute*5)
+
+	// If we have tokens we have success, so lets store tokens
+	if lr.Token() != nil {
+		session, err := sessionStore.Get(r, "direct-auth")
+		if err != nil {
+			log.Fatalf("could not get store: %s", err)
+		}
+		session.Values["access_token"] = lr.Token().AccessToken
+		session.Values["id_token"] = lr.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+		// redirect the user to /profile
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+
 	http.Redirect(w, r, "/login/factors", http.StatusFound)
 }
 
