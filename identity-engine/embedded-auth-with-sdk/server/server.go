@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	"github.com/howeyc/fsnotify"
@@ -119,6 +120,8 @@ func (s *Server) Run() {
 	r.HandleFunc("/login/factors/google_auth", s.handleLoginGoogleAuth).Methods("GET")
 	r.HandleFunc("/login/factors/google_auth", s.handleLoginGoogleAuthConfirmation).Methods("POST")
 	r.HandleFunc("/login/factors/google_auth/init", s.handleLoginGoogleAuthInit).Methods("GET")
+	r.HandleFunc("/login/factors/web_authn", s.handleLoginWebAuthNChallenge).Methods("GET")
+	r.HandleFunc("/login/factors/web_authn", s.handleLoginWebAuthNVerify).Methods("POST")
 
 	r.HandleFunc("/login/callback", s.handleLoginCallback).Methods("GET")
 
@@ -140,6 +143,9 @@ func (s *Server) Run() {
 	r.HandleFunc("/enrollOktaVerify/email", s.enrollOktaVerifyEmail).Methods("GET")
 	r.HandleFunc("/enrollOktaVerify/email/address", s.handleEnrollOktaVerifyEmailAddress).Methods("POST")
 	r.HandleFunc("/enrollOktaVerify/email/poll", s.handleEnrollOktaVerifyEmail).Methods("POST")
+	r.HandleFunc("/enrollWebAuthN", s.enrollWebAuthN).Methods("GET")
+	r.HandleFunc("/enrollWebAuthN", s.handleEnrollWebAuthN).Methods("POST")
+
 	r.HandleFunc("/enrollPhone", s.enrollPhone).Methods("GET")
 	r.HandleFunc("/enrollPhone", s.enrollPhoneMethod).Methods("POST")
 	r.HandleFunc("/enrollPhone/method", s.handleEnrollPhoneMethod).Methods("GET")
@@ -184,11 +190,18 @@ func (s *Server) Run() {
 
 	addr := "127.0.0.1:8000"
 	logger := log.New(os.Stderr, "http: ", log.LstdFlags)
+
+	credentials := handlers.AllowCredentials()
+	methods := handlers.AllowedMethods([]string{"POST", "GET", "PUT", "DELETE"})
+	origins := handlers.AllowedOrigins([]string{"*"})
+
+	handler := handlers.CORS(credentials, methods, origins)(r)
+
 	srv := &http.Server{
-		Handler:      r,
+		Handler:      handler,
 		Addr:         addr,
-		WriteTimeout: 15 * time.Second,
-		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 60 * time.Second,
+		ReadTimeout:  60 * time.Second,
 		ErrorLog:     logger,
 	}
 
@@ -290,6 +303,7 @@ func (s *Server) render(t string, w http.ResponseWriter, r *http.Request) {
 	s.ViewData["Authenticated"] = s.IsAuthenticated(r)
 
 	if session.Values["Errors"] != nil {
+		log.Printf("ERROR: %s", session.Values["Errors"])
 		s.ViewData["Errors"] = session.Values["Errors"]
 		delete(session.Values, "Errors")
 		session.Save(r, w)

@@ -1,0 +1,108 @@
+{{template "_head"}}
+
+<!-- CONTENT -->
+<main class="-mt-24 pb-8">
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:max-w-7xl lg:px-8">
+    <div class="grid grid-cols-1 gap-4 items-start lg:grid-cols-3 lg:gap-8">
+      <div class="grid grid-cols-1 gap-4 lg:col-span-2">
+        <section>
+          <div class="rounded-lg bg-white overflow-hidden shadow">
+            <div class="p-6">
+
+              <h1 class="text-4xl pb-4">Factor Enrollment</h1>
+                {{if ne .Errors ""}}
+                    {{template "_error" .Errors}}
+                {{end}}
+              <div class="row d-center">
+                <div class="col-md-8">
+                  <section id="forgotPasswordForm">
+                    <h4>Enroll your Web Authn authenticator.</h4>
+                  </section>
+                </div>
+
+                <div>
+                  <button id="btn" type="button"
+                          class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Setup
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+        {{template "_serverConfig"}}
+
+    </div>
+  </div>
+</main>
+<!-- END CONTENT -->
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script>
+  $(function () {
+    $('#btn').click(function () {
+      function binToStr(bin) {
+        return btoa(new Uint8Array(bin).reduce((s, byte) => s + String.fromCharCode(byte), ''));
+      }
+
+      function strToBin(str) {
+        return Uint8Array.from(atob(base64UrlSafeToBase64(str)), c => c.charCodeAt(0));
+      }
+
+      function base64UrlSafeToBase64(str) {
+        return str.replace(new RegExp('_', 'g'), '/').replace(new RegExp('-', 'g'), '+');
+      }
+
+      const challenge = '{{.Challenge}}'
+      const userId = '{{.UserID}}'
+      const username = '{{.Username}}'
+      const displayName = '{{.DisplayName}}'
+
+      const publicKeyCredentialCreationOptions = {
+        rp: {
+          name: "http://ocalhost:8000",
+          id: "localhost",
+        },
+        challenge: strToBin(challenge),
+        user: {
+          id: strToBin(userId),
+          name: name,
+          displayName: displayName,
+        },
+        pubKeyCredParams: [{alg: -7, type: "public-key"}],
+      };
+      navigator.credentials.create({
+        publicKey: publicKeyCredentialCreationOptions
+      }).then((newCredential) => {
+        const clientDataJSON = binToStr(newCredential.response.clientDataJSON);
+        const attestationObject = binToStr(newCredential.response.attestationObject);
+        const params = {
+          "clientData": clientDataJSON,
+          "attestation": attestationObject,
+          "challenge": challenge,
+          "userId": userId,
+          "username": username,
+          "displayName": displayName
+        };
+        const options = {
+          method: 'POST',
+          body: JSON.stringify(params),
+          headers: {"Content-type": "application/json; charset=UTF-8"}
+        };
+        fetch("/enrollWebAuthN", options).then(res => {
+          console.log("Request successful! Response:", res);
+          location.href = "/enrollFactor"
+        }).catch(function (err) {
+            console.error(err);
+          }
+        );
+      }).catch(function (err) {
+        console.error(err);
+      });
+    });
+  });
+</script>
+
+{{template "_footer"}}
