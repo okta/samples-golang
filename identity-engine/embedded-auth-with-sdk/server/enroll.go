@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"html/template"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"time"
@@ -49,10 +51,12 @@ func (s *Server) enrollFactor(w http.ResponseWriter, r *http.Request) {
 	s.ViewData["FactorPhone"] = enrollResponse.HasStep(idx.EnrollmentStepPhoneVerification)
 	s.ViewData["FactorEmail"] = enrollResponse.HasStep(idx.EnrollmentStepEmailVerification)
 	s.ViewData["FactorGoogleAuth"] = enrollResponse.HasStep(idx.EnrollmentStepGoogleAuthenticatorInit)
+	s.ViewData["FactorWebAuthN"] = enrollResponse.HasStep(idx.EnrollmentStepWebAuthNSetup)
 
 	if !enrollResponse.HasStep(idx.EnrollmentStepPhoneVerification) &&
 		!enrollResponse.HasStep(idx.EnrollmentStepEmailVerification) &&
-		!enrollResponse.HasStep(idx.EnrollmentStepGoogleAuthenticatorInit) {
+		!enrollResponse.HasStep(idx.EnrollmentStepGoogleAuthenticatorInit) &&
+		!enrollResponse.HasStep(idx.EnrollmentStepWebAuthNSetup) {
 		s.transitionToProfile(enrollResponse, w, r)
 		return
 	}
@@ -86,6 +90,9 @@ func (s *Server) handleEnrollFactor(w http.ResponseWriter, r *http.Request) {
 	case "push_google_auth":
 		http.Redirect(w, r, "/enrollGoogleAuth", http.StatusFound)
 		return
+	case "push_web_authn":
+		http.Redirect(w, r, "/enrollWebAuthN", http.StatusFound)
+		return
 	}
 	if enrollResponse.HasStep(idx.EnrollmentStepSkip) {
 		s.transitionToProfile(enrollResponse, w, r)
@@ -98,19 +105,19 @@ func (s *Server) transitionToProfile(er *idx.EnrollmentResponse, w http.Response
 	if err != nil {
 		log.Fatalf("could not get store: %s", err)
 	}
-
-	enrollResponse, err := er.Skip(r.Context())
-	if err != nil {
-		session.Values["Errors"] = err.Error()
-		session.Save(r, w)
-		http.Redirect(w, r, "/", http.StatusFound)
-		return
+	if er.HasStep(idx.EnrollmentStepSkip) {
+		er, err = er.Skip(r.Context())
+		if err != nil {
+			session.Values["Errors"] = err.Error()
+			session.Save(r, w)
+			http.Redirect(w, r, "/", http.StatusFound)
+			return
+		}
 	}
-	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
 
-	if enrollResponse.Token() != nil {
-		session.Values["access_token"] = enrollResponse.Token().AccessToken
-		session.Values["id_token"] = enrollResponse.Token().IDToken
+	if er.Token() != nil {
+		session.Values["access_token"] = er.Token().AccessToken
+		session.Values["id_token"] = er.Token().IDToken
 		err = session.Save(r, w)
 		if err != nil {
 			log.Fatalf("could not save access token: %s", err)
@@ -358,6 +365,92 @@ func (s *Server) enrollGoogleAuth(w http.ResponseWriter, r *http.Request) {
 	s.ViewData["QRCode"] = template.URL(enrollResponse.ContextualData().QRcode.Href)
 	s.ViewData["SharedSecret"] = template.URL(enrollResponse.ContextualData().SharedSecret)
 	s.render("enrollGoogleAuth.gohtml", w, r)
+}
+
+func (s *Server) enrollWebAuthN(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	if cer == nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepWebAuthNSetup) {
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+	enrollResponse, err := enrollResponse.WebAuthNSetup(r.Context())
+	if err != nil {
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+
+	s.ViewData["Challenge"] = enrollResponse.ContextualData().ActivationData.Challenge
+	s.ViewData["UserID"] = enrollResponse.ContextualData().ActivationData.User.ID
+	s.ViewData["Username"] = enrollResponse.ContextualData().ActivationData.User.Name
+	s.ViewData["DisplayName"] = enrollResponse.ContextualData().ActivationData.User.DisplayName
+	s.render("enrollWebAuthN.gohtml", w, r)
+}
+
+func (s *Server) handleEnrollWebAuthN(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	if cer == nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepWebAuthNVerify) {
+		http.Redirect(w, r, "/enrollWebAuthN", http.StatusFound)
+		return
+	}
+
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+
+	reqBody, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Fatalf("could not read request body: %v", err)
+	}
+	defer r.Body.Close()
+	var credentials idx.WebAuthNVerifyCredentials
+	if err := json.Unmarshal(reqBody, &credentials); err != nil {
+		log.Fatalf("could not unmarshal request body: %v", err)
+	}
+
+	enrollResponse, err = enrollResponse.WebAuthNVerify(r.Context(), &credentials)
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/enrollWebAuthN", http.StatusFound)
+		return
+	}
+	// If we have tokens we have success, so lets store tokens
+	if enrollResponse.Token() != nil {
+		session, err := sessionStore.Get(r, "direct-auth")
+		if err != nil {
+			log.Fatalf("could not get store: %s", err)
+		}
+		session.Values["access_token"] = enrollResponse.Token().AccessToken
+		session.Values["id_token"] = enrollResponse.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+		// redirect the user to /profile
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	enrollResponse, err = enrollResponse.WhereAmI(r.Context())
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+	http.Redirect(w, r, "/enrollFactor", http.StatusFound)
 }
 
 func (s *Server) handleEnrollGoogleAuthQRCode(w http.ResponseWriter, r *http.Request) {

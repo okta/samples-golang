@@ -23,6 +23,13 @@ These Examples are:
 4. Sign In/Sign Up with Social Identity Providers
 5. Sign In with Multifactor Authentication using Email or Phone
 
+### Enable CORS (Cross-Origin Resource Sharing)
+
+Your application must be configured to allow your application to make requests to the Okta API using the Okta session cookie. To enable CORS for your application do the following:
+
+- In your [Okta Developer Console], go to **Security > API > Trusted Origins**
+- Add your web application’s base URL `http://localhost:8000` with name `localhost` as a **Trusted Origin**.
+
 ## Installation & Running The App
 
 Run the application with the go run command.
