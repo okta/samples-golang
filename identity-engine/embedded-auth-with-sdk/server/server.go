@@ -110,6 +110,8 @@ func (s *Server) Run() {
 	r.HandleFunc("/login/factors/proceed", s.handleLoginSecondaryFactorsProceed).Methods("POST")
 	r.HandleFunc("/login/factors/email", s.handleLoginEmailVerification).Methods("GET")
 	r.HandleFunc("/login/factors/email", s.handleLoginEmailConfirmation).Methods("POST")
+	r.HandleFunc("/login/factors/security_question", s.handleLoginSecurityQuestion).Methods("GET")
+	r.HandleFunc("/login/factors/security_question", s.handleLoginSecurityQuestionSetup).Methods("POST")
 	r.HandleFunc("/login/factors/phone/method", s.handleLoginPhoneVerificationMethod).Methods("GET")
 	r.HandleFunc("/login/factors/phone", s.handleLoginPhoneVerification).Methods("GET")
 	r.HandleFunc("/login/factors/phone", s.handleLoginPhoneConfirmation).Methods("POST")
@@ -133,6 +135,8 @@ func (s *Server) Run() {
 	r.HandleFunc("/enrollGoogleAuth/code", s.handleEnrollGoogleAuthCode).Methods("POST")
 	r.HandleFunc("/enrollWebAuthN", s.enrollWebAuthN).Methods("GET")
 	r.HandleFunc("/enrollWebAuthN", s.handleEnrollWebAuthN).Methods("POST")
+	r.HandleFunc("/enrollSecurityQuestion", s.enrollSecurityQuestion).Methods("GET")
+	r.HandleFunc("/enrollSecurityQuestion", s.handleEnrollSecurityQuestion).Methods("POST")
 
 	r.HandleFunc("/enrollPhone", s.enrollPhone).Methods("GET")
 	r.HandleFunc("/enrollPhone", s.enrollPhoneMethod).Methods("POST")
