@@ -9,7 +9,7 @@ require (
 	github.com/gorilla/sessions v1.2.1
 	github.com/howeyc/fsnotify v0.9.0
 	github.com/liyue201/goqr v0.0.0-20200803022322-df443203d4ea
-	github.com/okta/okta-idx-golang v0.2.3-0.20220120165629-1990461ec34d
+	github.com/okta/okta-idx-golang v0.2.3-0.20220131174647-8b5672c969f1
 	github.com/okta/okta-sdk-golang/v2 v2.9.2
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/spf13/pflag v1.0.5
