@@ -21,7 +21,7 @@ These Examples are:
 2. Sign Out
 3. Sign Up
 4. Sign In/Sign Up with Social Identity Providers
-5. Sign In with Multifactor Authentication using Email or Phone
+5. Sign In with Multifactor Authentication using Email, Phone, Okta Verify, or Google Authenticator, or combinations of all four.
 
 ### Enable CORS (Cross-Origin Resource Sharing)
 
