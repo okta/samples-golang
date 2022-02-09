@@ -67,6 +67,15 @@
                               </label>
                             </div>
                           {{end}}
+                          {{if .FactorSecurityQuestion}}
+                            {{$checked = (and (not $checked) .FactorSecurityQuestion)}}
+                            <div class="flex items-center">
+                              <input id="push_security_question" name="push_factor" value="push_security_question" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"{{if $checked}} checked{{end}}>
+                              <label for="push_security_question" class="ml-3 block text-sm font-medium text-gray-700">
+                                Security Question
+                              </label>
+                            </div>
+                          {{end}}
                         </div>
                       </div>
                     </div>

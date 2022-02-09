@@ -63,14 +63,14 @@ func (s *Server) enrollFactor(w http.ResponseWriter, r *http.Request) {
 	s.ViewData["FactorOktaVerify"] = enrollResponse.HasStep(idx.EnrollmentStepOktaVerifyInit)
 	s.ViewData["FactorGoogleAuth"] = enrollResponse.HasStep(idx.EnrollmentStepGoogleAuthenticatorInit)
 	s.ViewData["FactorWebAuthN"] = enrollResponse.HasStep(idx.EnrollmentStepWebAuthNSetup)
+	s.ViewData["FactorSecurityQuestion"] = enrollResponse.HasStep(idx.EnrollmentStepSecurityQuestionOptions)
 
 	if !enrollResponse.HasStep(idx.EnrollmentStepPhoneVerification) &&
 		!enrollResponse.HasStep(idx.EnrollmentStepEmailVerification) &&
 		!enrollResponse.HasStep(idx.EnrollmentStepOktaVerifyInit) &&
 		!enrollResponse.HasStep(idx.EnrollmentStepGoogleAuthenticatorInit) &&
-		!enrollResponse.HasStep(idx.EnrollmentStepWebAuthNSetup) {
-
-		// implies skip
+		!enrollResponse.HasStep(idx.EnrollmentStepWebAuthNSetup) &&
+		!enrollResponse.HasStep(idx.EnrollmentStepSecurityQuestionOptions) {
 		s.transitionToProfile(enrollResponse, w, r)
 		return
 	}
@@ -104,6 +104,9 @@ func (s *Server) handleEnrollFactor(w http.ResponseWriter, r *http.Request) {
 		return
 	case "push_web_authn":
 		http.Redirect(w, r, "/enrollWebAuthN", http.StatusFound)
+		return
+	case "push_security_question":
+		http.Redirect(w, r, "/enrollSecurityQuestion", http.StatusFound)
 		return
 	}
 	if enrollResponse.HasStep(idx.EnrollmentStepSkip) {
@@ -572,6 +575,84 @@ func (s *Server) enrollGoogleAuth(w http.ResponseWriter, r *http.Request) {
 	s.ViewData["QRCode"] = template.URL(enrollResponse.ContextualData().QRcode.Href)
 	s.ViewData["SharedSecret"] = template.URL(enrollResponse.ContextualData().SharedSecret)
 	s.render("enrollGoogleAuth.gohtml", w, r)
+}
+
+func (s *Server) enrollSecurityQuestion(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	if cer == nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepSecurityQuestionOptions) {
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+	enrollResponse, questions, err := enrollResponse.SecurityQuestionOptions(r.Context())
+	if err != nil {
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+	s.ViewData["Questions"] = questions
+	s.render("enrollSecurityQuestion.gohtml", w, r)
+}
+
+func (s *Server) handleEnrollSecurityQuestion(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	if cer == nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepSecurityQuestionSetup) {
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+
+	sq := idx.SecurityQuestion{
+		QuestionKey: r.FormValue("question"),
+		Question:    r.FormValue("custom_question"),
+		Answer:      r.FormValue("answer"),
+	}
+
+	enrollResponse, err = enrollResponse.SetupSecurityQuestion(r.Context(), &sq)
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/enrollSecurityQuestion", http.StatusFound)
+		return
+	}
+	// If we have tokens we have success, so lets store tokens
+	if enrollResponse.Token() != nil {
+		session, err := sessionStore.Get(r, "direct-auth")
+		if err != nil {
+			log.Fatalf("could not get store: %s", err)
+		}
+		session.Values["access_token"] = enrollResponse.Token().AccessToken
+		session.Values["id_token"] = enrollResponse.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+		// redirect the user to /profile
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	enrollResponse, err = enrollResponse.WhereAmI(r.Context())
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+	http.Redirect(w, r, "/enrollFactor", http.StatusFound)
 }
 
 func (s *Server) enrollWebAuthN(w http.ResponseWriter, r *http.Request) {

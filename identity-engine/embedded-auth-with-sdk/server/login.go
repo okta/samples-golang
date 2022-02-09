@@ -152,6 +152,7 @@ func (s *Server) handleLoginSecondaryFactors(w http.ResponseWriter, r *http.Requ
 	s.ViewData["FactorOktaVerify"] = lr.HasStep(idx.LoginStepOktaVerify)
 	s.ViewData["FactorSkip"] = lr.HasStep(idx.LoginStepSkip)
 	s.ViewData["FactorWebAuthN"] = lr.HasStep(idx.LoginStepWebAuthNSetup) || lr.HasStep(idx.LoginStepWebAuthNChallenge)
+	s.ViewData["FactorSecurityQuestion"] = lr.HasStep(idx.LoginStepSecurityQuestionOptions)
 
 	s.render("loginSecondaryFactors.gohtml", w, r)
 }
@@ -181,6 +182,9 @@ func (s *Server) handleLoginSecondaryFactorsProceed(w http.ResponseWriter, r *ht
 		return
 	case "push_web_authn":
 		http.Redirect(w, r, "/login/factors/web_authn", http.StatusFound)
+		return
+	case "push_security_question":
+		http.Redirect(w, r, "/login/factors/security_question", http.StatusFound)
 		return
 	}
 	http.Redirect(w, r, "/login/factors", http.StatusFound)
@@ -263,6 +267,85 @@ func (s *Server) handleLoginEmailConfirmation(w http.ResponseWriter, r *http.Req
 	}
 	s.cache.Set("loginResponse", lr, time.Minute*5)
 	s.ViewData["InvalidEmailCode"] = false
+
+	// If we have tokens we have success, so lets store tokens
+	if lr.Token() != nil {
+		session, err := sessionStore.Get(r, "direct-auth")
+		if err != nil {
+			log.Fatalf("could not get store: %s", err)
+		}
+		session.Values["access_token"] = lr.Token().AccessToken
+		session.Values["id_token"] = lr.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+		// redirect the user to /profile
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	lr, err = lr.WhereAmI(r.Context())
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+	s.cache.Set("loginResponse", lr, time.Minute*5)
+	http.Redirect(w, r, "/login/factors", http.StatusFound)
+}
+
+func (s *Server) handleLoginSecurityQuestion(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	if clr == nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	lr := clr.(*idx.LoginResponse)
+	if !lr.HasStep(idx.LoginStepSecurityQuestionOptions) {
+		http.Redirect(w, r, "/login/factors", http.StatusFound)
+		return
+	}
+	lr, questions, err := lr.SecurityQuestionOptions(r.Context())
+	if err != nil {
+		http.Redirect(w, r, "/login/factors", http.StatusFound)
+		return
+	}
+	s.cache.Set("loginResponse", lr, time.Minute*5)
+	s.ViewData["Questions"] = questions
+	s.render("loginSetupSecurityQuestion.gohtml", w, r)
+}
+
+func (s *Server) handleLoginSecurityQuestionSetup(w http.ResponseWriter, r *http.Request) {
+	clr, _ := s.cache.Get("loginResponse")
+	if clr == nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	lr := clr.(*idx.LoginResponse)
+	if !lr.HasStep(idx.LoginStepSecurityQuestionSetup) {
+		http.Redirect(w, r, "/login/factors", http.StatusFound)
+		return
+	}
+
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+
+	sq := idx.SecurityQuestion{
+		QuestionKey: r.FormValue("question"),
+		Question:    r.FormValue("custom_question"),
+		Answer:      r.FormValue("answer"),
+	}
+	lr, err = lr.SecurityQuestionSetup(r.Context(), &sq)
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login/factors/security_question", http.StatusFound)
+		return
+	}
+	s.cache.Set("loginResponse", lr, time.Minute*5)
 
 	// If we have tokens we have success, so lets store tokens
 	if lr.Token() != nil {
