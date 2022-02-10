@@ -11,16 +11,16 @@
 
               <h1 class="text-4xl pb-4">Factor Login</h1>
 
-              <form class="space-y-6" action="/login/factors/okta-verify/totp" method="POST" autocomplete="off">
+              <form class="space-y-6" action="/login/factors/okta-verify/totp" method="POST">
                   {{if ne .Errors ""}}
                       {{template "_error" .Errors}}
                   {{end}}
                 <div>
-                  <label for="code" class="block text-sm font-medium text-gray-700" value="">
+                  <label for="code" class="block text-sm font-medium text-gray-700">
                     Enter the Code from your Okta Verify App
                   </label>
                   <div class="mt-1">
-                    <input id="code" name="code" type="text" required class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <input id="code" name="code" type="text" required class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" autocomplete="off">
                   </div>
                 </div>
 
