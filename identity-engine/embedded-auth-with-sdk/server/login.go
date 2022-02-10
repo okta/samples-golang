@@ -242,6 +242,18 @@ func (s *Server) handleLoginEmailVerification(w http.ResponseWriter, r *http.Req
 		}
 		s.cache.Set("loginResponse", lr, time.Minute*5)
 	}
+
+	// set the idx state string in the session for inspection for otp login callback comparison.
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+	session.Values["idxContext.state"] = lr.Context().State
+	err = session.Save(r, w)
+	if err != nil {
+		log.Fatalf("could not save idx context state: %s", err)
+	}
+
 	s.render("loginFactorEmail.gohtml", w, r)
 }
 
@@ -786,6 +798,21 @@ func (s *Server) handleLoginCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if code, found := r.URL.Query()["otp"]; found {
+
+		// If the login callback is called with otp and state values we need to
+		// check if the idx state string in the session is the same as the login
+		// response's context. If not, just display the otp value in a page and
+		// ask the user to enter the code in the original browser where they
+		// started the login flow login session.
+		state, found := session.Values["idxContext.state"]
+		if !found || lr.Context().State != state {
+			// need to keep the login response resident
+			s.cache.Set("loginResponse", lr, time.Minute*5)
+			s.ViewData["OTP"] = code[0]
+			s.render("loginFactorEmailOtp.gohtml", w, r)
+			return
+		}
+
 		lr, err = lr.ConfirmEmail(r.Context(), code[0])
 		if err != nil {
 			log.Fatalf("could not confirm email with otp code %q: %s", code[0], err)
