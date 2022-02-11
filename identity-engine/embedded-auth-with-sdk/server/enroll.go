@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"html/template"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"time"
@@ -45,21 +47,32 @@ func (s *Server) enrollFactor(w http.ResponseWriter, r *http.Request) {
 	cer, _ := s.cache.Get("enrollResponse")
 	enrollResponse := cer.(*idx.EnrollmentResponse)
 
-	s.ViewData["FactorSkip"] = enrollResponse.HasStep(idx.EnrollmentStepSkip)
-	s.ViewData["FactorPhone"] = enrollResponse.HasStep(idx.EnrollmentStepPhoneVerification)
-	s.ViewData["FactorEmail"] = enrollResponse.HasStep(idx.EnrollmentStepEmailVerification)
-	s.ViewData["FactorGoogleAuth"] = enrollResponse.HasStep(idx.EnrollmentStepGoogleAuthenticatorInit)
+	if errors, ok := s.cache.Get("Errors"); ok {
+		s.ViewData["Errors"] = errors
+		s.cache.Delete("Errors")
+	}
 
-	if !enrollResponse.HasStep(idx.EnrollmentStepPhoneVerification) &&
-		!enrollResponse.HasStep(idx.EnrollmentStepEmailVerification) &&
-		!enrollResponse.HasStep(idx.EnrollmentStepGoogleAuthenticatorInit) {
+	if enrollResponse.EnrollmentSuccess() {
 		s.transitionToProfile(enrollResponse, w, r)
 		return
 	}
 
-	if errors, ok := s.cache.Get("Errors"); ok {
-		s.ViewData["Errors"] = errors
-		s.cache.Delete("Errors")
+	s.ViewData["FactorSkip"] = enrollResponse.HasStep(idx.EnrollmentStepSkip)
+	s.ViewData["FactorPhone"] = enrollResponse.HasStep(idx.EnrollmentStepPhoneVerification)
+	s.ViewData["FactorEmail"] = enrollResponse.HasStep(idx.EnrollmentStepEmailVerification)
+	s.ViewData["FactorOktaVerify"] = enrollResponse.HasStep(idx.EnrollmentStepOktaVerifyInit)
+	s.ViewData["FactorGoogleAuth"] = enrollResponse.HasStep(idx.EnrollmentStepGoogleAuthenticatorInit)
+	s.ViewData["FactorWebAuthN"] = enrollResponse.HasStep(idx.EnrollmentStepWebAuthNSetup)
+	s.ViewData["FactorSecurityQuestion"] = enrollResponse.HasStep(idx.EnrollmentStepSecurityQuestionOptions)
+
+	if !enrollResponse.HasStep(idx.EnrollmentStepPhoneVerification) &&
+		!enrollResponse.HasStep(idx.EnrollmentStepEmailVerification) &&
+		!enrollResponse.HasStep(idx.EnrollmentStepOktaVerifyInit) &&
+		!enrollResponse.HasStep(idx.EnrollmentStepGoogleAuthenticatorInit) &&
+		!enrollResponse.HasStep(idx.EnrollmentStepWebAuthNSetup) &&
+		!enrollResponse.HasStep(idx.EnrollmentStepSecurityQuestionOptions) {
+		s.transitionToProfile(enrollResponse, w, r)
+		return
 	}
 
 	s.render("enroll.gohtml", w, r)
@@ -83,8 +96,17 @@ func (s *Server) handleEnrollFactor(w http.ResponseWriter, r *http.Request) {
 	case "push_phone":
 		http.Redirect(w, r, "/enrollPhone", http.StatusFound)
 		return
+	case "push_okta_verify":
+		http.Redirect(w, r, "/enrollOktaVerify", http.StatusFound)
+		return
 	case "push_google_auth":
 		http.Redirect(w, r, "/enrollGoogleAuth", http.StatusFound)
+		return
+	case "push_web_authn":
+		http.Redirect(w, r, "/enrollWebAuthN", http.StatusFound)
+		return
+	case "push_security_question":
+		http.Redirect(w, r, "/enrollSecurityQuestion", http.StatusFound)
 		return
 	}
 	if enrollResponse.HasStep(idx.EnrollmentStepSkip) {
@@ -99,23 +121,29 @@ func (s *Server) transitionToProfile(er *idx.EnrollmentResponse, w http.Response
 		log.Fatalf("could not get store: %s", err)
 	}
 
-	enrollResponse, err := er.Skip(r.Context())
-	if err != nil {
-		session.Values["Errors"] = err.Error()
-		session.Save(r, w)
-		http.Redirect(w, r, "/", http.StatusFound)
-		return
+	// skip can be an option if we aren't at the conclusion of enrollment success
+	if !er.EnrollmentSuccess() {
+		er, err := er.Skip(r.Context())
+		if err != nil {
+			session.Values["Errors"] = err.Error()
+			session.Save(r, w)
+			http.Redirect(w, r, "/", http.StatusFound)
+			return
+		}
+		s.cache.Set("enrollResponse", er, time.Minute*5)
 	}
-	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
 
-	if enrollResponse.Token() != nil {
-		session.Values["access_token"] = enrollResponse.Token().AccessToken
-		session.Values["id_token"] = enrollResponse.Token().IDToken
+	if er.Token() != nil {
+		session.Values["access_token"] = er.Token().AccessToken
+		session.Values["id_token"] = er.Token().IDToken
 		err = session.Save(r, w)
 		if err != nil {
 			log.Fatalf("could not save access token: %s", err)
 		}
+	} else {
+		log.Fatal("attempting to transition to profile but no token is present")
 	}
+
 	http.Redirect(w, r, "/", http.StatusFound)
 	return
 }
@@ -338,6 +366,195 @@ func (s *Server) handleEnrollEmail(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/enrollFactor", http.StatusFound)
 }
 
+func (s *Server) enrollOktaVerify(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepOktaVerifyInit) {
+		s.ViewData["Errors"] = "Missing enrollment step Okta Verify"
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+
+	s.render("enrollOktaVerify.gohtml", w, r)
+}
+
+func (s *Server) enrollOktaVerifyQR(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepOktaVerifyInit) {
+		s.ViewData["Errors"] = "Missing enrollment step Okta Verify"
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+
+	enrollResponse, err := enrollResponse.OktaVerifyInit(r.Context(), idx.OktaVerifyOptionQRCode)
+	if err != nil {
+		log.Fatalf("okta verify error: %s", err)
+	}
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+
+	s.ViewData["QRCode"] = enrollResponse.ContextualData().QRcode.Href
+	s.render("enrollOktaVerifyQR.gohtml", w, r)
+}
+
+func (s *Server) handleEnrollOktaVerifyQR(w http.ResponseWriter, r *http.Request) {
+	// we don't need to poll anylonger if enrollment step enroll poll is missing  and enroll okta verify is missing
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	_, continuePolling, err := enrollResponse.OktaVerifyContinuePolling(r.Context())
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+	if err != nil {
+		log.Fatalf("okta verify confirmation error: %s", err)
+	}
+
+	data := struct {
+		ContinuePolling bool
+		Next            string
+	}{continuePolling, "/enrollFactor"}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	resp, err := json.Marshal(data)
+	if err != nil {
+		log.Fatalf("Error happened in JSON marshal. Err: %s", err)
+	}
+	w.Write(resp)
+}
+
+func (s *Server) enrollOktaVerifySMS(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepOktaVerifyInit) {
+		s.ViewData["Errors"] = "Missing enrollment step Okta Verify"
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+
+	s.render("enrollOktaVerifySMS.gohtml", w, r)
+}
+
+func (s *Server) handleEnrollOktaVerifySMSNumber(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepOktaVerifyInit) {
+		s.ViewData["Errors"] = "Missing enrollment step Okta Verify"
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+
+	var data map[string]interface{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&data)
+	if err != nil {
+		panic(err)
+	}
+	phoneNumber, found := data["phoneNumber"]
+	if !found {
+		panic(data)
+	}
+
+	enrollResponse, err = enrollResponse.OktaVerifySMSInit(r.Context(), phoneNumber.(string))
+	if err != nil {
+		log.Fatalf("okta verify error: %s", err)
+	}
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleEnrollOktaVerifySMS(w http.ResponseWriter, r *http.Request) {
+	// we don't need to poll anylonger if enrollment step enroll poll is missing  and enroll okta verify is missing
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	_, continuePolling, err := enrollResponse.OktaVerifyContinuePolling(r.Context())
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+	if err != nil {
+		log.Fatalf("okta verify confirmation error: %s", err)
+	}
+
+	data := struct {
+		ContinuePolling bool
+		Next            string
+	}{continuePolling, "/enrollFactor"}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	resp, err := json.Marshal(data)
+	if err != nil {
+		log.Fatalf("Error happened in JSON marshal. Err: %s", err)
+	}
+	w.Write(resp)
+}
+
+func (s *Server) enrollOktaVerifyEmail(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepOktaVerifyInit) {
+		s.ViewData["Errors"] = "Missing enrollment step Okta Verify"
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+
+	s.render("enrollOktaVerifyEmail.gohtml", w, r)
+}
+
+func (s *Server) handleEnrollOktaVerifyEmailAddress(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepOktaVerifyInit) {
+		s.ViewData["Errors"] = "Missing enrollment step Okta Verify"
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+
+	var data map[string]interface{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&data)
+	if err != nil {
+		panic(err)
+	}
+	email, found := data["email"]
+	if !found {
+		panic(data)
+	}
+
+	enrollResponse, err = enrollResponse.OktaVerifyEmailInit(r.Context(), email.(string))
+	if err != nil {
+		log.Fatalf("okta verify error: %s", err)
+	}
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleEnrollOktaVerifyEmail(w http.ResponseWriter, r *http.Request) {
+	// we don't need to poll anylonger if enrollment step enroll poll is missing  and enroll okta verify is missing
+	cer, _ := s.cache.Get("enrollResponse")
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	_, continuePolling, err := enrollResponse.OktaVerifyContinuePolling(r.Context())
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+	if err != nil {
+		log.Fatalf("okta verify confirmation error: %s", err)
+	}
+
+	data := struct {
+		ContinuePolling bool
+		Next            string
+	}{continuePolling, "/enrollFactor"}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	resp, err := json.Marshal(data)
+	if err != nil {
+		log.Fatalf("Error happened in JSON marshal. Err: %s", err)
+	}
+	w.Write(resp)
+}
+
 func (s *Server) enrollGoogleAuth(w http.ResponseWriter, r *http.Request) {
 	cer, _ := s.cache.Get("enrollResponse")
 	if cer == nil {
@@ -358,6 +575,170 @@ func (s *Server) enrollGoogleAuth(w http.ResponseWriter, r *http.Request) {
 	s.ViewData["QRCode"] = template.URL(enrollResponse.ContextualData().QRcode.Href)
 	s.ViewData["SharedSecret"] = template.URL(enrollResponse.ContextualData().SharedSecret)
 	s.render("enrollGoogleAuth.gohtml", w, r)
+}
+
+func (s *Server) enrollSecurityQuestion(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	if cer == nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepSecurityQuestionOptions) {
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+	enrollResponse, questions, err := enrollResponse.SecurityQuestionOptions(r.Context())
+	if err != nil {
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+	s.ViewData["Questions"] = questions
+	s.render("enrollSecurityQuestion.gohtml", w, r)
+}
+
+func (s *Server) handleEnrollSecurityQuestion(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	if cer == nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepSecurityQuestionSetup) {
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+
+	sq := idx.SecurityQuestion{
+		QuestionKey: r.FormValue("question"),
+		Question:    r.FormValue("custom_question"),
+		Answer:      r.FormValue("answer"),
+	}
+
+	enrollResponse, err = enrollResponse.SetupSecurityQuestion(r.Context(), &sq)
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/enrollSecurityQuestion", http.StatusFound)
+		return
+	}
+	// If we have tokens we have success, so lets store tokens
+	if enrollResponse.Token() != nil {
+		session, err := sessionStore.Get(r, "direct-auth")
+		if err != nil {
+			log.Fatalf("could not get store: %s", err)
+		}
+		session.Values["access_token"] = enrollResponse.Token().AccessToken
+		session.Values["id_token"] = enrollResponse.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+		// redirect the user to /profile
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	enrollResponse, err = enrollResponse.WhereAmI(r.Context())
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+	http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+}
+
+func (s *Server) enrollWebAuthN(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	if cer == nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepWebAuthNSetup) {
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+	enrollResponse, err := enrollResponse.WebAuthNSetup(r.Context())
+	if err != nil {
+		http.Redirect(w, r, "/enrollFactor", http.StatusFound)
+		return
+	}
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+
+	s.ViewData["Challenge"] = enrollResponse.ContextualData().ActivationData.Challenge
+	s.ViewData["UserID"] = enrollResponse.ContextualData().ActivationData.User.ID
+	s.ViewData["Username"] = enrollResponse.ContextualData().ActivationData.User.Name
+	s.ViewData["DisplayName"] = enrollResponse.ContextualData().ActivationData.User.DisplayName
+	s.render("enrollWebAuthN.gohtml", w, r)
+}
+
+func (s *Server) handleEnrollWebAuthN(w http.ResponseWriter, r *http.Request) {
+	cer, _ := s.cache.Get("enrollResponse")
+	if cer == nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	enrollResponse := cer.(*idx.EnrollmentResponse)
+	if !enrollResponse.HasStep(idx.EnrollmentStepWebAuthNVerify) {
+		http.Redirect(w, r, "/enrollWebAuthN", http.StatusFound)
+		return
+	}
+
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+
+	reqBody, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Fatalf("could not read request body: %v", err)
+	}
+	defer r.Body.Close()
+	var credentials idx.WebAuthNVerifyCredentials
+	if err := json.Unmarshal(reqBody, &credentials); err != nil {
+		log.Fatalf("could not unmarshal request body: %v", err)
+	}
+
+	enrollResponse, err = enrollResponse.WebAuthNVerify(r.Context(), &credentials)
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/enrollWebAuthN", http.StatusFound)
+		return
+	}
+	// If we have tokens we have success, so lets store tokens
+	if enrollResponse.Token() != nil {
+		session, err := sessionStore.Get(r, "direct-auth")
+		if err != nil {
+			log.Fatalf("could not get store: %s", err)
+		}
+		session.Values["access_token"] = enrollResponse.Token().AccessToken
+		session.Values["id_token"] = enrollResponse.Token().IDToken
+		err = session.Save(r, w)
+		if err != nil {
+			log.Fatalf("could not save access token: %s", err)
+		}
+		// redirect the user to /profile
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	enrollResponse, err = enrollResponse.WhereAmI(r.Context())
+	if err != nil {
+		session.Values["Errors"] = err.Error()
+		session.Save(r, w)
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+	s.cache.Set("enrollResponse", enrollResponse, time.Minute*5)
+	http.Redirect(w, r, "/enrollFactor", http.StatusFound)
 }
 
 func (s *Server) handleEnrollGoogleAuthQRCode(w http.ResponseWriter, r *http.Request) {

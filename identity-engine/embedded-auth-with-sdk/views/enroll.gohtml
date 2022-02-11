@@ -22,30 +22,60 @@
                           <p class="text-sm text-gray-500">We require you to enroll in the following factors:</p>
                         {{end}}
                         <div class="mt-4 space-y-4">
+                          {{$checked := .FactorEmail}}
                           {{if .FactorEmail}}
                             <div class="flex items-center">
-                              <input id="push_email" name="push_factor" value="push_email" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" checked>
+                              <input id="push_email" name="push_factor" value="push_email" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300" {{if $checked}} checked{{end}}>
                               <label for="push_email" class="ml-3 block text-sm font-medium text-gray-700">
                                 Email
                               </label>
                             </div>
                           {{end}}
                           {{if .FactorPhone}}
+                            {{$checked = (and (not $checked) .FactorPhone)}}
                             <div class="flex items-center">
-                              <input id="push_phone" name="push_factor" value="push_phone" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"{{if not .FactorEmail}} checked{{end}}>
+                              <input id="push_phone" name="push_factor" value="push_phone" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"{{if $checked}} checked{{end}}>
                               <label for="push_phone" class="ml-3 block text-sm font-medium text-gray-700">
                                 Phone
                               </label>
                             </div>
                           {{end}}
-                            {{if .FactorGoogleAuth}}
+                          {{if .FactorOktaVerify}}
+                            {{$checked = (and (not $checked) .FactorOktaVerify)}}
                               <div class="flex items-center">
-                                <input id="push_google_auth" name="push_factor" value="push_google_auth" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"{{if not .FactorEmail}} checked{{end}}>
-                                <label for="push_google_auth" class="ml-3 block text-sm font-medium text-gray-700">
-                                  Google Authenticator
-                                </label>
+                                  <input id="push_okta_verify" name="push_factor" value="push_okta_verify" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"{{if $checked}} checked{{end}}>
+                                  <label for="push_okta_verify" class="ml-3 block text-sm font-medium text-gray-700">
+                                      Okta Verify
+                                  </label>
                               </div>
-                            {{end}}
+                          {{end}}
+                          {{if .FactorGoogleAuth}}
+                            {{$checked = (and (not $checked) .FactorGoogleAuth)}}
+                            <div class="flex items-center">
+                              <input id="push_google_auth" name="push_factor" value="push_google_auth" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"{{if $checked}} checked{{end}}>
+                              <label for="push_google_auth" class="ml-3 block text-sm font-medium text-gray-700">
+                                Google Authenticator
+                              </label>
+                            </div>
+                          {{end}}
+                          {{if .FactorWebAuthN}}
+                            {{$checked = (and (not $checked) .FactorWebAuthN)}}
+                            <div class="flex items-center">
+                              <input id="push_web_authn" name="push_factor" value="push_web_authn" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"{{if $checked}} checked{{end}}>
+                              <label for="push_web_authn" class="ml-3 block text-sm font-medium text-gray-700">
+                                Security Key or Biometric
+                              </label>
+                            </div>
+                          {{end}}
+                          {{if .FactorSecurityQuestion}}
+                            {{$checked = (and (not $checked) .FactorSecurityQuestion)}}
+                            <div class="flex items-center">
+                              <input id="push_security_question" name="push_factor" value="push_security_question" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"{{if $checked}} checked{{end}}>
+                              <label for="push_security_question" class="ml-3 block text-sm font-medium text-gray-700">
+                                Security Question
+                              </label>
+                            </div>
+                          {{end}}
                         </div>
                       </div>
                     </div>

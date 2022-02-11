@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	"github.com/howeyc/fsnotify"
@@ -109,18 +110,25 @@ func (s *Server) Run() {
 	r.HandleFunc("/login/factors/proceed", s.handleLoginSecondaryFactorsProceed).Methods("POST")
 	r.HandleFunc("/login/factors/email", s.handleLoginEmailVerification).Methods("GET")
 	r.HandleFunc("/login/factors/email", s.handleLoginEmailConfirmation).Methods("POST")
+	r.HandleFunc("/login/factors/security_question", s.handleLoginSecurityQuestion).Methods("GET")
+	r.HandleFunc("/login/factors/security_question", s.handleLoginSecurityQuestionSetup).Methods("POST")
 	r.HandleFunc("/login/factors/phone/method", s.handleLoginPhoneVerificationMethod).Methods("GET")
 	r.HandleFunc("/login/factors/phone", s.handleLoginPhoneVerification).Methods("GET")
 	r.HandleFunc("/login/factors/phone", s.handleLoginPhoneConfirmation).Methods("POST")
+	r.HandleFunc("/login/factors/okta-verify", s.handleLoginOktaVerify).Methods("GET")
+	r.HandleFunc("/login/factors/okta-verify/totp", s.handleLoginOktaVerifyTotp).Methods("GET")
+	r.HandleFunc("/login/factors/okta-verify/totp", s.handleLoginOktaVerifyTotpConfirmation).Methods("POST")
+	r.HandleFunc("/login/factors/okta-verify/push", s.handleLoginOktaVerifyPush).Methods("GET")
 	r.HandleFunc("/login/factors/google_auth", s.handleLoginGoogleAuth).Methods("GET")
 	r.HandleFunc("/login/factors/google_auth", s.handleLoginGoogleAuthConfirmation).Methods("POST")
 	r.HandleFunc("/login/factors/google_auth/init", s.handleLoginGoogleAuthInit).Methods("GET")
+	r.HandleFunc("/login/factors/web_authn", s.handleLoginWebAuthNChallenge).Methods("GET")
+	r.HandleFunc("/login/factors/web_authn", s.handleLoginWebAuthNVerify).Methods("POST")
 
 	r.HandleFunc("/login/callback", s.handleLoginCallback).Methods("GET")
 
 	r.HandleFunc("/register", s.register).Methods("GET")
 	r.HandleFunc("/register", s.handleRegister).Methods("POST")
-
 	r.HandleFunc("/enrollFactor", s.enrollFactor).Methods("GET")
 	r.HandleFunc("/enrollFactor", s.handleEnrollFactor).Methods("POST")
 	r.HandleFunc("/enrollEmail", s.enrollEmail).Methods("GET")
@@ -128,6 +136,20 @@ func (s *Server) Run() {
 	r.HandleFunc("/enrollGoogleAuth", s.enrollGoogleAuth).Methods("GET")
 	r.HandleFunc("/enrollGoogleAuth", s.handleEnrollGoogleAuthQRCode).Methods("POST")
 	r.HandleFunc("/enrollGoogleAuth/code", s.handleEnrollGoogleAuthCode).Methods("POST")
+	r.HandleFunc("/enrollOktaVerify", s.enrollOktaVerify).Methods("GET")
+	r.HandleFunc("/enrollOktaVerify/qr", s.enrollOktaVerifyQR).Methods("GET")
+	r.HandleFunc("/enrollOktaVerify/qr/poll", s.handleEnrollOktaVerifyQR).Methods("POST")
+	r.HandleFunc("/enrollOktaVerify/sms", s.enrollOktaVerifySMS).Methods("GET")
+	r.HandleFunc("/enrollOktaVerify/sms/number", s.handleEnrollOktaVerifySMSNumber).Methods("POST")
+	r.HandleFunc("/enrollOktaVerify/sms/poll", s.handleEnrollOktaVerifySMS).Methods("POST")
+	r.HandleFunc("/enrollOktaVerify/email", s.enrollOktaVerifyEmail).Methods("GET")
+	r.HandleFunc("/enrollOktaVerify/email/address", s.handleEnrollOktaVerifyEmailAddress).Methods("POST")
+	r.HandleFunc("/enrollOktaVerify/email/poll", s.handleEnrollOktaVerifyEmail).Methods("POST")
+	r.HandleFunc("/enrollWebAuthN", s.enrollWebAuthN).Methods("GET")
+	r.HandleFunc("/enrollWebAuthN", s.handleEnrollWebAuthN).Methods("POST")
+	r.HandleFunc("/enrollSecurityQuestion", s.enrollSecurityQuestion).Methods("GET")
+	r.HandleFunc("/enrollSecurityQuestion", s.handleEnrollSecurityQuestion).Methods("POST")
+
 	r.HandleFunc("/enrollPhone", s.enrollPhone).Methods("GET")
 	r.HandleFunc("/enrollPhone", s.enrollPhoneMethod).Methods("POST")
 	r.HandleFunc("/enrollPhone/method", s.handleEnrollPhoneMethod).Methods("GET")
@@ -172,11 +194,18 @@ func (s *Server) Run() {
 
 	addr := "127.0.0.1:8000"
 	logger := log.New(os.Stderr, "http: ", log.LstdFlags)
+
+	credentials := handlers.AllowCredentials()
+	methods := handlers.AllowedMethods([]string{"POST", "GET", "PUT", "DELETE"})
+	origins := handlers.AllowedOrigins([]string{"*"})
+
+	handler := handlers.CORS(credentials, methods, origins)(r)
+
 	srv := &http.Server{
-		Handler:      r,
+		Handler:      handler,
 		Addr:         addr,
-		WriteTimeout: 15 * time.Second,
-		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 60 * time.Second,
+		ReadTimeout:  60 * time.Second,
 		ErrorLog:     logger,
 	}
 
@@ -278,6 +307,7 @@ func (s *Server) render(t string, w http.ResponseWriter, r *http.Request) {
 	s.ViewData["Authenticated"] = s.IsAuthenticated(r)
 
 	if session.Values["Errors"] != nil {
+		log.Printf("ERROR: %s", session.Values["Errors"])
 		s.ViewData["Errors"] = session.Values["Errors"]
 		delete(session.Values, "Errors")
 		session.Save(r, w)

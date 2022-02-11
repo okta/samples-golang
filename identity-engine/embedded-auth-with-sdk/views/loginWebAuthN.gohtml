@@ -1,0 +1,106 @@
+{{template "_head"}}
+
+<!-- CONTENT -->
+<main class="-mt-24 pb-8">
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:max-w-7xl lg:px-8">
+    <div class="grid grid-cols-1 gap-4 items-start lg:grid-cols-3 lg:gap-8">
+      <div class="grid grid-cols-1 gap-4 lg:col-span-2">
+        <section>
+          <div class="rounded-lg bg-white overflow-hidden shadow">
+            <div class="p-6">
+
+              <h1 class="text-4xl pb-4">Factor Login</h1>
+                {{if ne .Errors ""}}
+                    {{template "_error" .Errors}}
+                {{end}}
+              <div class="row d-center">
+                <div class="col-md-8">
+                  <section id="forgotPasswordForm">
+                    <h4>Login with Web Authn authenticator.</h4>
+                  </section>
+                </div>
+
+                <div>
+                  <button id="btn-verify" type="button"
+                          class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Verify
+                  </button>
+                </div>
+              </div>
+
+
+            </div>
+          </div>
+        </section>
+      </div>
+
+        {{template "_serverConfig"}}
+
+    </div>
+  </div>
+</main>
+<!-- END CONTENT -->
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script>
+  $(function () {
+    $('#btn-verify').click(function () {
+      function binToStr(bin) {
+        return btoa(new Uint8Array(bin).reduce((s, byte) => s + String.fromCharCode(byte), ''));
+      }
+
+      function strToBin(str) {
+        return Uint8Array.from(atob(base64UrlSafeToBase64(str)), c => c.charCodeAt(0));
+      }
+
+      function base64UrlSafeToBase64(str) {
+        return str.replace(new RegExp('_', 'g'), '/').replace(new RegExp('-', 'g'), '+');
+      }
+
+      const challenge = '{{.Challenge}}'
+      const webauthnCredentialID = '{{.WebauthnCredentialID}}'
+
+      const publicKeyCredentialRequestOptions = {
+        challenge: strToBin(challenge),
+        allowCredentials: [
+          {
+            id: strToBin(webauthnCredentialID),
+            type: 'public-key',
+          }
+        ],
+        userVerification: 'discouraged',
+        timeout: 60000,
+      };
+      navigator.credentials.get({
+        publicKey: publicKeyCredentialRequestOptions
+      }).then((assertion) => {
+        const clientData = binToStr(assertion.response.clientDataJSON);
+        const authenticatorData = binToStr(assertion.response.authenticatorData);
+        const signatureData = binToStr(assertion.response.signature);
+
+        const params = {
+          "clientData": clientData,
+          "authenticatorData": authenticatorData,
+          "signatureData": signatureData
+        };
+
+        const options = {
+          method: 'POST',
+          body: JSON.stringify(params),
+          headers: {"Content-type": "application/json; charset=UTF-8"}
+        };
+        fetch("/login/factors/web_authn", options).then(res => {
+          console.log("Request successful! Response:", res);
+          location.href = "/login/factors"
+        }).catch(function (err) {
+            console.error(err);
+          }
+        );
+      }).catch(function (err) {
+        console.error(err);
+      });
+    });
+  });
+</script>
+
+{{template "_footer"}}

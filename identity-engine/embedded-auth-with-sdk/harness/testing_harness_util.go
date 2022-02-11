@@ -165,6 +165,14 @@ func (th *TestHarness) waitForEnrollPasswordForm() error {
 	return th.seesElement(`form[action="/enrollPassword"]`)
 }
 
+func (th *TestHarness) waitForEnrollSecurityQuestionForm() error {
+	return th.seesElement(`form[action="/enrollSecurityQuestion"]`)
+}
+
+func (th *TestHarness) waitForLoginEnrollSecurityQuestionForm() error {
+	return th.seesElement(`form[action="/login/factors/security_question"]`)
+}
+
 func (th *TestHarness) waitForResetPasswordForm() error {
 	return th.seesElement(`form[action="/passwordRecovery/newPassword"]`)
 }
@@ -465,19 +473,6 @@ func (th *TestHarness) doesNotSeeElementWithText(selector, text string) error {
 	return err
 }
 
-func (th *TestHarness) clicksButton(selector string) error {
-	return th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
-		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
-		if err != nil {
-			return false, nil
-		}
-		if err = elem.Click(); err != nil {
-			return false, err
-		}
-		return true, nil
-	}, defaultTimeout(), defaultInterval())
-}
-
 func (th *TestHarness) clicksButtonWithText(selector, text string) error {
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
@@ -502,6 +497,19 @@ func (th *TestHarness) clicksButtonWithText(selector, text string) error {
 	}, defaultTimeout(), defaultInterval())
 
 	return err
+}
+
+func (th *TestHarness) clicksButton(selector string) error {
+	return th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
+		if err != nil {
+			return false, nil
+		}
+		if err = elem.Click(); err != nil {
+			return false, err
+		}
+		return true, nil
+	}, defaultTimeout(), defaultInterval())
 }
 
 func (th *TestHarness) clicksInputWithValue(selector, text string) error {
@@ -642,14 +650,6 @@ func (th *TestHarness) fillsInTheCorrectCode() error {
 
 func (th *TestHarness) fillsInTheIncorrectCode() error {
 	return th.entersText(`input[name="code"]`, randomString())
-}
-
-func (th *TestHarness) factorList() error {
-	err := th.seesElement(`form[action="/login/factors/proceed"]`)
-	if err == nil {
-		return nil
-	}
-	return th.seesElement(`form[action="/enrollFactor"]`)
 }
 
 func (th *TestHarness) seesPageToSetNewPassword() error {

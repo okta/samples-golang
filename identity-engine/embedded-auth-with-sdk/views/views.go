@@ -41,6 +41,8 @@ func NewView(c *idx.Client, s *sessions.CookieStore) *ViewConfig {
 func (vc *ViewConfig) TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"configOption": configOption,
+		"safeURL":      func(u string) template.URL { return template.URL(u) },
+		"safeHTML":     func(h string) template.HTML { return template.HTML(h) },
 	}
 }
 

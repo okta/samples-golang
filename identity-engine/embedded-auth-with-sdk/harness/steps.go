@@ -33,6 +33,7 @@ func (th *TestHarness) steps(ctx *godog.ScenarioContext) {
 	ctx.Step(`fills in new (First Name|Last Name)`, th.fillsInIdentity)
 	ctx.Step(`fills in new (valid|invalid) (email|phone number)`, th.fillsInNewEmailOrPhoneNumber)
 	ctx.Step(`fills in new password to (reset|enroll)`, th.fillsNewPassword)
+	ctx.Step(`fills in the (answer|question)`, th.fillsAnswerOrQuestion)
 	ctx.Step(`is logged out`, th.isLoggedOut)
 	ctx.Step(`is redirected to the (Root|Password Recovery) view`, th.redirected)
 	ctx.Step(`logs in to the application`, th.loginToApplication)
@@ -44,14 +45,15 @@ func (th *TestHarness) steps(ctx *godog.ScenarioContext) {
 	ctx.Step(`sees a list of (enrollment|verification) factors`, th.listOfFactors)
 	ctx.Step(`sees a logout button`, th.seesLogoutButton)
 	ctx.Step(`sees a page to input a code`, th.code)
-	ctx.Step(`selects (Email|Phone|Google Authenticator) factor`, th.selectsFactor)
-	ctx.Step(`submits the (Login|Recovery|New Password|Registration|Code|New Phone|Verify) form`, th.submitsTheForm)
+	ctx.Step(`selects (Email|Phone|Google Authenticator|Security Question) factor`, th.selectsFactor)
+	ctx.Step(`submits the (Login|Recovery|New Password|Registration|Code|New Phone|Verify|Security Question) form`, th.submitsTheForm)
 	ctx.Step(`she selects SMS`, th.selectSMS)
 	ctx.Step(`^logs into Facebook$`, th.logsIntoFacebook)
 	ctx.Step(`is enrolled in (Google Authenticator|other)`, th.isEnrolledIn)
 	ctx.Step(`maybe has to skip`, th.maybeSkip)
 	ctx.Step(`app sign-on policy requires (one|two) factors`, th.appSignOnPolicyRuleFactors)
 	ctx.Step(`sleeps for ([^" ]+)`, th.debugSleep)
+	ctx.Step(`selects (predefined|custom) Security Question`, th.selectSecurityQuestion)
 
 	// Background
 	ctx.Step(`there is (existing|new) user named ([^"]*)$`, th.user)
@@ -66,6 +68,32 @@ func (th *TestHarness) debugSleep(amount string) error {
 		return err
 	}
 	time.Sleep(d)
+	return nil
+}
+
+func (th *TestHarness) selectSecurityQuestion(q string) error {
+	switch q {
+	case "predefined":
+		elem, err := th.wd.FindElement(selenium.ByCSSSelector, `option[value="disliked_food"]`)
+		if err != nil {
+			return fmt.Errorf("failed to select 'disliked_food' security question from dropdown list: %w", err)
+		}
+		err = elem.Click()
+		if err != nil {
+			return fmt.Errorf("failed to click on 'disliked_food': %w", err)
+		}
+	case "custom":
+		elem, err := th.wd.FindElement(selenium.ByCSSSelector, `option[value="custom"]`)
+		if err != nil {
+			return fmt.Errorf("failed to select 'custom' security question from dropdown list: %w", err)
+		}
+		err = elem.Click()
+		if err != nil {
+			return fmt.Errorf("failed to click on 'custom': %w", err)
+		}
+	default:
+		return errors.New("invalid question type, should be either 'predefined' or 'custom'")
+	}
 	return nil
 }
 
@@ -527,6 +555,10 @@ func (th *TestHarness) selectsFactor(factor string) error {
 		err = th.clicksButton(`input[id="push_phone"]`)
 	case "Google Authenticator":
 		err = th.clicksButton(`input[id="push_google_auth"]`)
+	case "Security Question":
+		err = th.clicksButton(`input[id="push_security_question"]`)
+	default:
+		err = errors.New("invalid factor")
 	}
 	if err != nil {
 		return err
@@ -540,7 +572,7 @@ func (th *TestHarness) submitsTheForm(form string) error {
 		return th.submitsForm(`button[type="submit"]`, "Login")
 	case "Registration":
 		return th.submitsForm(`button[type="submit"]`, "Register")
-	case "New Password", "Code", "Recovery", "New Phone", "Verify":
+	case "New Password", "Code", "Recovery", "New Phone", "Verify", "Security Question":
 		return th.submitsForm(`button[type="submit"]`, "Submit")
 	}
 	return fmt.Errorf("'%s' submission form is undefined", form)
@@ -689,6 +721,16 @@ func (th *TestHarness) fillsNewPassword(scenario string) error {
 		return th.fillsInFormValue(`input[name="confirmPassword"]`, p, th.waitForResetPasswordForm)
 	}
 	return errors.New("invalid scenario, should be either 'enroll' or 'reset'")
+}
+
+func (th *TestHarness) fillsAnswerOrQuestion(t string) error {
+	switch t {
+	case "question":
+		return th.entersText(`input[name="custom_question"]`, "Say what?")
+	case "answer":
+		return th.entersText(`input[name="answer"]`, "okta")
+	}
+	return errors.New("invalid scenario, should be either 'answer' or 'question'")
 }
 
 func (th *TestHarness) fillsInNewEmailOrPhoneNumber(state, sourceType string) error {
