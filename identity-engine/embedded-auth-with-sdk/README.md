@@ -21,7 +21,14 @@ These Examples are:
 2. Sign Out
 3. Sign Up
 4. Sign In/Sign Up with Social Identity Providers
-5. Sign In with Multifactor Authentication using Email or Phone
+5. Sign In with Multifactor Authentication using Email, Phone, Okta Verify, or Google Authenticator, or combinations of all four.
+
+### Enable CORS (Cross-Origin Resource Sharing)
+
+Your application must be configured to allow your application to make requests to the Okta API using the Okta session cookie. To enable CORS for your application do the following:
+
+- In your [Okta Developer Console], go to **Security > API > Trusted Origins**
+- Add your web application’s base URL `http://localhost:8000` with name `localhost` as a **Trusted Origin**.
 
 ## Installation & Running The App
 
@@ -60,16 +67,15 @@ Next, start Selenium in one shell.
 $ selenium-server -port 4444
 
 # or, run a selenium server with its jar directly
+
+$ java -jar selenium-server-4.1.1.jar standalone --port 4444
 ```
 
 Then run the tests in a separate shell.
 
-Set all the claim attributes from `/userinfo` that should be checked into a
-JSON formatted string environment variable called `OKTA_IDX_CLAIMS`. Also, these
-environment variables are utilized for the test user in the selenium tests.
+These environment variables are utilized for the test user in the selenium tests:
 
-* `OKTA_IDX_USER_NAME` - The test user that the features will be run as (string)
-* `OKTA_IDX_PASSWORD` - The test users's password (string)
+* `OKTA_IDX_APP_NAME` - name of the application (default is "Golang IDX Web App")
 * `OKTA_IDX_CLAIMS` - Name/value JSON map of claims that will be checked (string)
 * `SELENIUM_URL` - The Selenium server's URL (string)
 * `DEBUG=true` - Triggers debug loglines from the godog harness to be emitted
@@ -84,10 +90,8 @@ environment variables are utilized for the test user in the selenium tests.
 # OKTA_IDX_SCOPES, OKTA_IDX_REDIRECTURI have been
 # exported into the shell or are set in the $HOME/.okta/okta.yaml file
 
-$ export OKTA_IDX_CLAIMS='{"email":"tester@okta.com","email_verified":"","family_name":"Er","given_name":"Test","locale":"en-US","name":"TestEr","preferred_username":"tester@okta.com","sub":"00abcdefghijklmnopqr","updated_at":"","zoneinfo":"America/Los_Angeles"}'
-
-$ OKTA_IDX_USER_NAME=tester@okta.com OKTA_IDX_PASSWORD=abc123 SELENIUM_URL="http://127.0.0.1:4444/wd/hub" go test -v
+$ SELENIUM_URL="http://127.0.0.1:4444/wd/hub" go test -v
 
 # filter on cucumber tags which scenarios to run
-$ OKTA_IDX_USER_NAME=tester@okta.com OKTA_IDX_PASSWORD=abc123 SELENIUM_URL="http://127.0.0.1:4444/wd/hub" go test -v --godog.format=pretty --godog.tags=wip
+$ SELENIUM_URL="http://127.0.0.1:4444/wd/hub" go test -v --godog.format=pretty --godog.tags=wip
 ```

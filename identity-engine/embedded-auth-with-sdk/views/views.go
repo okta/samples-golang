@@ -22,13 +22,10 @@ import (
 	"strings"
 
 	"github.com/gorilla/sessions"
-
 	idx "github.com/okta/okta-idx-golang"
 )
 
-var (
-	idxClient *idx.Client
-)
+var idxClient *idx.Client
 
 type ViewConfig struct {
 	session *sessions.CookieStore
@@ -44,6 +41,8 @@ func NewView(c *idx.Client, s *sessions.CookieStore) *ViewConfig {
 func (vc *ViewConfig) TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"configOption": configOption,
+		"safeURL":      func(u string) template.URL { return template.URL(u) },
+		"safeHTML":     func(h string) template.HTML { return template.HTML(h) },
 	}
 }
 

@@ -1,0 +1,50 @@
+{{template "_head"}}
+
+<!-- CONTENT -->
+<main class="-mt-24 pb-8">
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:max-w-7xl lg:px-8">
+    <div class="grid grid-cols-1 gap-4 items-start lg:grid-cols-3 lg:gap-8">
+      <div class="grid grid-cols-1 gap-4 lg:col-span-2">
+        <section>
+          <div class="rounded-lg bg-white overflow-hidden shadow">
+            <div class="p-6">
+
+              <h1 class="text-4xl pb-4">Factor Login</h1>
+
+              <form class="space-y-6" action="/login/factors/google_auth" method="GET">
+                  {{if ne .Errors ""}}
+                      {{template "_error" .Errors}}
+                  {{end}}
+                <div>
+                  <h2 class="text-center">Scan QR code</h2>
+                  <div class="center">
+                    <img class="center" id="qr-code" src="{{.QRCode}}" alt="QR code"/>
+                    <p class="text-sm text-gray-500">Launch Google Authenticator, tap the "+" icon, then select "Scan a
+                      QR code".</p>
+                  </div>
+                  <div class="center">
+                    <p class="text-sm text-gray-500">Can't scan the QR? Use this shared secret instead.</p>
+                    <p class="text-sm text-gray-500" id="shared-secret"><b>{{.SharedSecret}}</b></p>
+                  </div>
+                </div>
+                <div>
+                  <button type="submit"
+                          class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Continue
+                  </button>
+                </div>
+              </form>
+
+            </div>
+          </div>
+        </section>
+      </div>
+
+        {{template "_serverConfig"}}
+
+    </div>
+  </div>
+</main>
+<!-- END CONTENT -->
+
+{{template "_footer"}}

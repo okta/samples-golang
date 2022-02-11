@@ -1,3 +1,4 @@
+@no-ci @fixme
 Feature: 7.1 Direct Auth with Self Hosted Sign In Widget Social Login with 1 Social IDP
 
   Background:

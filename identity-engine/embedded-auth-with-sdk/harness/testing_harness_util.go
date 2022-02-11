@@ -149,44 +149,6 @@ func (th *TestHarness) waitForPageRender() error {
 	return th.seesElement(`html body h1`)
 }
 
-func (th *TestHarness) checkEntryPoints() error {
-	baseURL := fmt.Sprintf("http://%s", th.server.Address())
-	links := []struct {
-		text string
-		href string
-	}{
-		{
-			text: "Sign In",
-			href: fmt.Sprintf("%s/login", baseURL),
-		},
-		{
-			text: "Sign Up",
-			href: fmt.Sprintf("%s/register", baseURL),
-		},
-		{
-			text: "Password Recovery",
-			href: fmt.Sprintf("%s/passwordRecovery", baseURL),
-		},
-		{
-			text: "Logout",
-			href: fmt.Sprintf("%s/logout", baseURL),
-		},
-	}
-
-	for _, link := range links {
-		elem, err := th.wd.FindElement(selenium.ByLinkText, link.text)
-		if err != nil {
-			return err
-		}
-		href, err := elem.GetAttribute("href")
-		if !strings.HasSuffix(link.href, href) {
-			return fmt.Errorf("expected to find link %q with href %q but found it with %q", link.text, link.href, href)
-		}
-	}
-
-	return nil
-}
-
 func (th *TestHarness) waitForLoginForm() error {
 	return th.seesElement(`form[action="/login"]`)
 }
@@ -201,6 +163,18 @@ func (th *TestHarness) waitForRegistrationForm() error {
 
 func (th *TestHarness) waitForEnrollPasswordForm() error {
 	return th.seesElement(`form[action="/enrollPassword"]`)
+}
+
+func (th *TestHarness) waitForEnrollSecurityQuestionForm() error {
+	return th.seesElement(`form[action="/enrollSecurityQuestion"]`)
+}
+
+func (th *TestHarness) waitForLoginEnrollSecurityQuestionForm() error {
+	return th.seesElement(`form[action="/login/factors/security_question"]`)
+}
+
+func (th *TestHarness) waitForResetPasswordForm() error {
+	return th.seesElement(`form[action="/passwordRecovery/newPassword"]`)
 }
 
 func (th *TestHarness) waitForEnrollFactorForm() error {
@@ -232,40 +206,6 @@ func (th *TestHarness) seesClaimsTableItemAndValueFromCurrentProfile(key string)
 	return th.seesElementIDWithValue(keyID, value)
 }
 
-func (th *TestHarness) loginToApplication() error {
-	err := th.clickLink("Sign In")
-	if err != nil {
-		return err
-	}
-
-	if err = th.waitForPageRender(); err != nil {
-		return err
-	}
-
-	if err = th.waitForLoginForm(); err != nil {
-		return err
-	}
-
-	if err = th.fillsInUsername(); err != nil {
-		return err
-	}
-
-	if err = th.fillsInPassword(); err != nil {
-		return err
-	}
-
-	if err = th.submitsLoginForm(); err != nil {
-		return err
-	}
-
-	if err = th.waitForPageRender(); err != nil {
-		return err
-	}
-
-	text := fmt.Sprintf("Welcome, %s.", claimItem("name"))
-	return th.seesElementWithText(`html body h1`, text)
-}
-
 type waitFor func() error
 
 func (th *TestHarness) fillsInFormValue(selector, value string, waitForForm waitFor) error {
@@ -281,10 +221,6 @@ func (th *TestHarness) fillsInFormValue(selector, value string, waitForForm wait
 }
 
 func (th *TestHarness) clicksFormCheckItem(selector string, waitForForm waitFor) error {
-	/*if err := waitForForm(); err != nil {
-		return err
-	}*/
-
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
 		if err != nil {
@@ -299,14 +235,6 @@ func (th *TestHarness) clicksFormCheckItem(selector string, waitForForm waitFor)
 	}, defaultTimeout(), defaultInterval())
 
 	return err
-}
-
-func (th *TestHarness) existingUser() error {
-	th.currentProfile = &A18NProfile{
-		EmailAddress: os.Getenv("OKTA_IDX_USER_NAME"),
-		Password:     os.Getenv("OKTA_IDX_PASSWORD"),
-	}
-	return nil
 }
 
 func (th *TestHarness) fillsInUsername() error {
@@ -410,21 +338,6 @@ func (th *TestHarness) seesNoAccountErrorMessage() error {
 	return th.matchErrorMessage("There is no account with the Username")
 }
 
-func (th *TestHarness) seesErrorMessage(message string) error {
-	if th.currentProfile == nil {
-		return errors.New("test harness doesn't have a current profile")
-	}
-	if strings.Contains(message, "is no account") {
-		message += " " + strings.ReplaceAll(th.currentProfile.EmailAddress, "@", "+1@") + "."
-	}
-	return th.matchErrorMessage(message)
-}
-
-func (th *TestHarness) isLoggedOut() error {
-	text := fmt.Sprintf("Welcome, %s.", claimItem("name"))
-	return th.doesNotSeeElementWithText(`html body h1`, text)
-}
-
 func (th *TestHarness) seesClaimsTable() error {
 	claims := claims()
 
@@ -461,14 +374,6 @@ func (th *TestHarness) doesntSeeClaimsTable() error {
 	}
 
 	return nil
-}
-
-func (th *TestHarness) seesLogoutButton() error {
-	return th.seesElementWithText(`button[type="submit"]`, "Logout")
-}
-
-func (th *TestHarness) clicksLogoutButton() error {
-	return th.clicksButtonWithText(`button[type="submit"]`, "Logout")
 }
 
 func (th *TestHarness) clicksForgotPasswordButton() error {
@@ -568,19 +473,6 @@ func (th *TestHarness) doesNotSeeElementWithText(selector, text string) error {
 	return err
 }
 
-func (th *TestHarness) clicksButton(selector string) error {
-	return th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
-		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
-		if err != nil {
-			return false, nil
-		}
-		if err = elem.Click(); err != nil {
-			return false, err
-		}
-		return true, nil
-	}, defaultTimeout(), defaultInterval())
-}
-
 func (th *TestHarness) clicksButtonWithText(selector, text string) error {
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
@@ -605,6 +497,19 @@ func (th *TestHarness) clicksButtonWithText(selector, text string) error {
 	}, defaultTimeout(), defaultInterval())
 
 	return err
+}
+
+func (th *TestHarness) clicksButton(selector string) error {
+	return th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		elem, err := th.wd.FindElement(selenium.ByCSSSelector, selector)
+		if err != nil {
+			return false, nil
+		}
+		if err = elem.Click(); err != nil {
+			return false, err
+		}
+		return true, nil
+	}, defaultTimeout(), defaultInterval())
 }
 
 func (th *TestHarness) clicksInputWithValue(selector, text string) error {
@@ -637,12 +542,12 @@ func (th *TestHarness) seesElementIDWithValue(elementID, text string) error {
 	err := th.wd.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		elem, err := th.wd.FindElement(selenium.ByID, elementID)
 		if err != nil {
-			return false, nil
+			return false, err
 		}
 
 		elemText, err := elem.Text()
 		if err != nil {
-			return false, nil
+			return false, err
 		}
 
 		if strings.TrimSpace(elemText) != text {
@@ -736,7 +641,7 @@ func (th *TestHarness) fillsInTheCorrectCode() error {
 	if th.currentProfile == nil {
 		return errors.New("test harness doesn't have a current profile")
 	}
-	code, err := th.verificationCode(th.currentProfile.URL, EMAIL_CODE_TYPE)
+	code, err := th.verificationCode(th.currentProfile.URL, EmailCodeType)
 	if err != nil {
 		return fmt.Errorf("faild to find latest verification code for user %s: %v", th.currentProfile.EmailAddress, err)
 	}
@@ -745,10 +650,6 @@ func (th *TestHarness) fillsInTheCorrectCode() error {
 
 func (th *TestHarness) fillsInTheIncorrectCode() error {
 	return th.entersText(`input[name="code"]`, randomString())
-}
-
-func (th *TestHarness) factorList() error {
-	return th.seesElement(`form[action="/login/factors/proceed"]`)
 }
 
 func (th *TestHarness) seesPageToSetNewPassword() error {
@@ -768,19 +669,6 @@ func (th *TestHarness) inputsIncorrectEmail() error {
 		return errors.New("test harness doesn't have a current profile")
 	}
 	return th.entersText(`input[name="identifier"]`, strings.ReplaceAll(th.currentProfile.EmailAddress, "@", "+1@"))
-}
-
-func (th *TestHarness) destroyCurrentProfile() error {
-	if th.currentProfile == nil {
-		return nil
-	}
-	err := th.deleteProfileFromOrg(th.currentProfile.UserID)
-	if err != nil {
-		return err
-	}
-	err = th.deleteProfile(th.currentProfile)
-	th.currentProfile = nil
-	return err
 }
 
 func (th *TestHarness) createCurrentProfile(name string) error {
@@ -806,6 +694,13 @@ func (th *TestHarness) selectsPhone() error {
 	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
 }
 
+func (th *TestHarness) selectsGoogleAuthenticator() error {
+	if err := th.clicksFormCheckItem(`input[id="push_google_auth"]`, th.waitForEnrollFactorForm); err != nil {
+		return err
+	}
+	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
+}
+
 func (th *TestHarness) clicksSkip() error {
 	return th.clicksInputWithValue(`input[type="submit"]`, "Skip")
 }
@@ -814,7 +709,7 @@ func (th *TestHarness) fillsInTheEnrollmentCode() error {
 	if th.currentProfile == nil {
 		return errors.New("test harness doesn't have a current profile")
 	}
-	code, err := th.verificationCode(th.currentProfile.URL, EMAIL_CODE_TYPE)
+	code, err := th.verificationCode(th.currentProfile.URL, EmailCodeType)
 	if err != nil {
 		return fmt.Errorf("faild to find latest verification code for user %s: %v", th.currentProfile.ProfileID, err)
 	}
@@ -847,7 +742,7 @@ func (th *TestHarness) fillsInReceiveSMSCode() error {
 }
 
 func (th *TestHarness) fillsInTheEnrollmentCodeSMS() error {
-	code, err := th.verificationCode(th.currentProfile.URL, SMS_CODE_TYPE)
+	code, err := th.verificationCode(th.currentProfile.URL, SmsCodeType)
 	if err != nil {
 		return fmt.Errorf("faild to find latest verification code for user %s: %v", th.currentProfile.ProfileID, err)
 	}
@@ -895,16 +790,6 @@ func (th *TestHarness) submitsMethod() error {
 		return err
 	}
 	return th.clicksButtonWithText(`button[type="submit"]`, "Continue")
-}
-
-func (th *TestHarness) debugSleep(amount string) error {
-	// And sleep 60s
-	d, err := time.ParseDuration(amount)
-	if err != nil {
-		return err
-	}
-	time.Sleep(d)
-	return nil
 }
 
 func (th *TestHarness) clicksVerifySMSCode() error {
@@ -966,7 +851,7 @@ func (th *TestHarness) latestVerificationCode(profileURL, codeType string) (stri
 }
 
 func (th *TestHarness) deleteProfile(profile *A18NProfile) error {
-	if profile.URL == "" {
+	if profile == nil || profile.URL == "" {
 		return nil
 	}
 	req, err := http.NewRequest(http.MethodDelete, profile.URL, nil)
@@ -979,6 +864,23 @@ func (th *TestHarness) deleteProfile(profile *A18NProfile) error {
 		return err
 	}
 	defer resp.Body.Close()
+	return nil
+}
+
+func (th *TestHarness) deleteAllTestProfiles() error {
+	profiles, err := th.profiles()
+	if err != nil {
+		return fmt.Errorf("failed to list profiles: %w", err)
+	}
+	for _, profile := range profiles.Profiles {
+		if !strings.Contains(profile.DisplayName, "Marie") {
+			continue
+		}
+		err = th.deleteProfile(&profile)
+		if err != nil {
+			return fmt.Errorf("failed to delete test profile: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -1045,40 +947,4 @@ type userFactor struct {
 	FactorType string                 `json:"factorType"`
 	Provider   string                 `json:"provider"`
 	Profile    map[string]interface{} `json:"profile"`
-}
-
-func (th *TestHarness) facebookUser() error {
-	th.currentProfile = &A18NProfile{
-		EmailAddress: os.Getenv("OKTA_IDX_FACEBOOK_USER_NAME"),
-		Password:     os.Getenv("OKTA_IDX_FACEBOOK_USER_PASSWORD"),
-		GivenName:    "Golang",
-		FamilyName:   "User",
-		DisplayName:  "Golang SDK Test User",
-	}
-	return nil
-}
-
-func (th *TestHarness) clicksLoginWithFacebook() error {
-	return th.clicksButtonWithText(`span[class="px-4"]`, "FB IdP")
-}
-
-func (th *TestHarness) waitForFacebookLoginForm() error {
-	return th.seesElement(`form[id="login_form"]`)
-}
-
-func (th *TestHarness) logsIntoFacebook() error {
-	if th.currentProfile == nil {
-		return errors.New("test harness doesn't have a current profile")
-	}
-
-	err := th.fillsInFormValue(`input[name="email"]`, th.currentProfile.EmailAddress, th.waitForFacebookLoginForm)
-	if err != nil {
-		return err
-	}
-	err = th.fillsInFormValue(`input[name="pass"]`, th.currentProfile.Password, th.waitForFacebookLoginForm)
-	if err != nil {
-		return err
-	}
-	err = th.clicksButton(`button[type="submit"]`)
-	return err
 }

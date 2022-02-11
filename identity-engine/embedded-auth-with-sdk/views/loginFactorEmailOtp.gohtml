@@ -1,0 +1,26 @@
+
+{{template "_head"}}
+
+    <!-- CONTENT -->
+    <main class="-mt-24 pb-8">
+      <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:max-w-7xl lg:px-8">
+        <div class="grid grid-cols-1 gap-4 items-start lg:grid-cols-3 lg:gap-8">
+          <div class="grid grid-cols-1 gap-4 lg:col-span-2">
+            <section>
+              <div class="rounded-lg bg-white overflow-hidden shadow">
+                <div class="p-6">
+                    <h1 class="text-4xl pb-4">Factor Login</h1>
+                    <p>Please enter this code where you initiated email verification: {{ .OTP }}</p>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          {{template "_serverConfig"}}
+
+        </div>
+      </div>
+    </main>
+    <!-- END CONTENT -->
+
+{{template "_footer"}}
