@@ -32,6 +32,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	idx "github.com/okta/okta-idx-golang"
+	"github.com/patrickmn/go-cache"
 
 	"github.com/okta/samples-golang/identity-engine/embedded-sign-in-widget/config"
 )
@@ -41,14 +42,14 @@ const (
 )
 
 type Server struct {
-	config            *config.Config
-	idxClient         *idx.Client
-	currentIdxContext *idx.Context
-	tpl               *template.Template
-	sessionStore      *sessions.CookieStore
-	LoginData         LoginData
-	svc               *http.Server
-	address           string
+	config       *config.Config
+	idxClient    *idx.Client
+	tpl          *template.Template
+	sessionStore *sessions.CookieStore
+	LoginData    LoginData
+	svc          *http.Server
+	address      string
+	cache        *cache.Cache
 }
 
 type LoginData struct {
@@ -61,6 +62,7 @@ type LoginData struct {
 	InteractionHandle   string
 	CodeChallenge       string
 	CodeChallengeMethod string
+	OTP                 string
 }
 
 func NewServer(c *config.Config) *Server {
@@ -74,6 +76,7 @@ func NewServer(c *config.Config) *Server {
 		tpl:          template.Must(template.ParseGlob("templates/*.gohtml")),
 		idxClient:    idx,
 		sessionStore: sessions.NewCookieStore([]byte("randomKey")),
+		cache:        cache.New(5*time.Minute, 10*time.Minute),
 	}
 }
 
@@ -136,14 +139,7 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatalf("error idx client init login: %+v", err)
 	}
-
-	if s.currentIdxContext == nil {
-		idxContext, err := s.idxClient.Interact(r.Context())
-		if err != nil {
-			log.Fatalf("error idx context: %+v", err)
-		}
-		s.currentIdxContext = idxContext
-	}
+	s.cache.Set("loginResponse", lr, time.Minute*5)
 
 	issuerURL := s.idxClient.Config().Okta.IDX.Issuer
 	issuerParts, err := url.Parse(issuerURL)
@@ -157,10 +153,10 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		RedirectURI:         s.idxClient.Config().Okta.IDX.RedirectURI,
 		ClientId:            s.idxClient.Config().Okta.IDX.ClientID,
 		Issuer:              s.idxClient.Config().Okta.IDX.Issuer,
-		State:               s.currentIdxContext.State,
-		CodeChallenge:       s.currentIdxContext.CodeChallenge,
-		CodeChallengeMethod: s.currentIdxContext.CodeChallengeMethod,
-		InteractionHandle:   s.currentIdxContext.InteractionHandle.InteractionHandle,
+		State:               lr.Context().State,
+		CodeChallenge:       lr.Context().CodeChallenge,
+		CodeChallengeMethod: lr.Context().CodeChallengeMethod,
+		InteractionHandle:   lr.Context().InteractionHandle.InteractionHandle,
 	}
 	err = s.tpl.ExecuteTemplate(w, "login.gohtml", s.LoginData)
 	if err != nil {
@@ -181,9 +177,31 @@ func (s *Server) LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	clr, found := s.cache.Get("loginResponse")
+	if !found {
+		log.Fatalln("loginResponse is not cached")
+	}
+	lr := clr.(*idx.LoginResponse)
+	lr, err := lr.WhereAmI(r.Context())
+	if !found {
+		log.Fatalf("loginRespons WhereAmI error: %s", err.Error())
+	}
+
 	// Check the state that was returned in the query string is the same as the above state
-	if r.URL.Query().Get("state") != s.currentIdxContext.State {
-		fmt.Fprintf(w, "The state was not as expected, got %q, expected %q", r.URL.Query().Get("state"), s.currentIdxContext.State)
+	if r.URL.Query().Get("state") != lr.Context().State {
+		fmt.Fprintf(w, "The state was not as expected, got %q, expected %q", r.URL.Query().Get("state"), lr.Context().State)
+		return
+	}
+
+	// inbound magic link otp
+	if r.URL.Query().Get("otp") != "" {
+		w.Header().Add("Cache-Control", "no-cache")
+
+		s.LoginData.OTP = r.URL.Query().Get("otp")
+		err := s.tpl.ExecuteTemplate(w, "login.gohtml", s.LoginData)
+		if err != nil {
+			fmt.Printf("error: %s\n", err.Error())
+		}
 		return
 	}
 
@@ -198,7 +216,7 @@ func (s *Server) LoginCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	accessToken, err := s.idxClient.RedeemInteractionCode(r.Context(), s.currentIdxContext, r.URL.Query().Get("interaction_code"))
+	accessToken, err := s.idxClient.RedeemInteractionCode(r.Context(), lr.Context(), r.URL.Query().Get("interaction_code"))
 	if err != nil {
 		log.Fatalf("access token error: %+v\n", err)
 	}
@@ -248,7 +266,7 @@ func (s *Server) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// reset the idx context
-	s.currentIdxContext = nil
+	s.cache.Flush()
 	http.Redirect(w, r, logoutURL, http.StatusFound)
 }
 
