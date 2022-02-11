@@ -202,6 +202,10 @@ github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRW
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
 github.com/okta/okta-idx-golang v0.2.3-0.20220204172640-d01d3c3ddfbe h1:ogF/otfEdW6CbpAn2ovequ4o949ucKVa8LN1y4f0Fwg=
 github.com/okta/okta-idx-golang v0.2.3-0.20220204172640-d01d3c3ddfbe/go.mod h1:2PD9qCga5a3GH+6QHTUQXf5Uvc06Q6eZIKgHiF8QLLE=
+github.com/okta/okta-idx-golang v0.2.3-0.20220210004607-e778b7bbadff h1:KYAgSwviOYXcjn3M6SWKmr84nfGBgN0H4oI2bs8oJIQ=
+github.com/okta/okta-idx-golang v0.2.3-0.20220210004607-e778b7bbadff/go.mod h1:2PD9qCga5a3GH+6QHTUQXf5Uvc06Q6eZIKgHiF8QLLE=
+github.com/okta/okta-idx-golang v0.2.3-0.20220211004546-63d548cd5229 h1:1syblIdE/4NOfgFsxNGsYVxS5xehaDgS3VnaaJoiGbk=
+github.com/okta/okta-idx-golang v0.2.3-0.20220211004546-63d548cd5229/go.mod h1:2PD9qCga5a3GH+6QHTUQXf5Uvc06Q6eZIKgHiF8QLLE=
 github.com/okta/okta-jwt-verifier-golang v1.1.1 h1:yL4uSwtVQ6L3m2Pq8tcVUbb8e/SZ7p/r6eduqq1YjBM=
 github.com/okta/okta-jwt-verifier-golang v1.1.1/go.mod h1:Nw85EhrNXkWgfkhE9lggRoRVZLVm7zf/ZtglDUzkKU8=
 github.com/okta/okta-sdk-golang/v2 v2.9.2 h1:lfzCnRCNpRHOci647McWw3+RFR5gVPkeIYSBlRGzdfA=

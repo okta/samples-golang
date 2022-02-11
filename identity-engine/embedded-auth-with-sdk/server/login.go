@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -19,7 +18,7 @@ import (
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	s.cache.Delete("loginResponse")
 	// Initialize the login so we can see if there are Social IDP's to display
-	lr, err := s.idxClient.InitLogin(context.TODO())
+	lr, err := s.idxClient.InitLogin(r.Context())
 	if err != nil {
 		log.Fatalf("Could not initalize login: %s", err.Error())
 	}
@@ -92,7 +91,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		log.Fatalf("could not get store: %s", err)
 	}
 
-	lr, err = lr.Identify(context.TODO(), ir)
+	lr, err = lr.Identify(r.Context(), ir)
 	if err != nil {
 		session.Values["Errors"] = err.Error()
 		session.Save(r, w)
@@ -243,6 +242,18 @@ func (s *Server) handleLoginEmailVerification(w http.ResponseWriter, r *http.Req
 		}
 		s.cache.Set("loginResponse", lr, time.Minute*5)
 	}
+
+	// set the idx state string in the session for inspection for otp login callback comparison.
+	session, err := sessionStore.Get(r, "direct-auth")
+	if err != nil {
+		log.Fatalf("could not get store: %s", err)
+	}
+	session.Values["idxContext.state"] = lr.Context().State
+	err = session.Save(r, w)
+	if err != nil {
+		log.Fatalf("could not save idx context state: %s", err)
+	}
+
 	s.render("loginFactorEmail.gohtml", w, r)
 }
 
@@ -786,20 +797,41 @@ func (s *Server) handleLoginCallback(w http.ResponseWriter, r *http.Request) {
 		log.Fatalf("could not get store: %s", err)
 	}
 
-	lr, err = lr.WhereAmI(context.TODO())
-	if err != nil {
-		log.Fatalf("could not tell where I am: %s", err)
+	if code, found := r.URL.Query()["otp"]; found {
+
+		// If the login callback is called with otp and state values we need to
+		// check if the idx state string in the session is the same as the login
+		// response's context. If not, just display the otp value in a page and
+		// ask the user to enter the code in the original browser where they
+		// started the login flow login session.
+		state, found := session.Values["idxContext.state"]
+		if !found || lr.Context().State != state {
+			// need to keep the login response resident
+			s.cache.Set("loginResponse", lr, time.Minute*5)
+			s.ViewData["OTP"] = code[0]
+			s.render("loginFactorEmailOtp.gohtml", w, r)
+			return
+		}
+
+		lr, err = lr.ConfirmEmail(r.Context(), code[0])
+		if err != nil {
+			log.Fatalf("could not confirm email with otp code %q: %s", code[0], err)
+		}
+	} else {
+		lr, err = lr.WhereAmI(r.Context())
+		if err != nil {
+			log.Fatalf("could not tell where I am: %s", err)
+		}
 	}
 
-	if !lr.HasStep(idx.LoginStepSuccess) {
-		var steps []string
-		for _, step := range lr.AvailableSteps() {
-			steps = append(steps, step.String())
+	// Deal with there aren't any login steps, perhaps user didn't complete enrollment.
+	if len(lr.AvailableSteps()) == 0 ||
+		(len(lr.AvailableSteps()) == 1 && lr.HasStep(idx.LoginStepCancel)) {
+		session, err := sessionStore.Get(r, "direct-auth")
+		if err == nil {
+			session.Values["Errors"] = "There should be should be additional login factors available but they are not."
 		}
-		fmt.Printf("Non Success after IDP Redirect not supported. Available steps: %s", strings.Join(steps, ","))
-		session.Values["Errors"] = "Multifactor Authentication and Social Identity Providers is not currently supported, Authentication failed."
-		session.Save(r, w)
-		http.Redirect(w, r, "/login", http.StatusFound)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 
