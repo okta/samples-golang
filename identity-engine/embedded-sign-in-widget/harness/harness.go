@@ -145,6 +145,7 @@ func (th *TestHarness) InitializeScenario(ctx *godog.ScenarioContext) {
 		capabilities["tunnel-identifier"] = os.Getenv("TRAVIS_JOB_NUMBER")
 		capabilities["build"] = os.Getenv("TRAVIS_BUILD_NUMBER")
 		capabilities["tags"] = []string{os.Getenv("TRAVIS_GO_VERSION"), "CI"}
+		capabilities["public"] = "share"
 		sauceUsername := os.Getenv("SAUCE_USERNAME")
 		sauceAccessKey := os.Getenv("SAUCE_ACCESS_KEY")
 		seleniumUrl = fmt.Sprintf("http://%s:%s@ondemand.saucelabs.com/wd/hub", sauceUsername, sauceAccessKey)
