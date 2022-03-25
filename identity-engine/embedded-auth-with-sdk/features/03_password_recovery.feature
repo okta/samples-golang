@@ -4,7 +4,7 @@ Feature: 3.1 Direct Auth Password Recovery
   Background:
     Given there is existing user named Marie Curie
 
-  @3.1.1
+  @3.1.1 @no-ci @fixme
   Scenario: 3.1.1 Marie resets her password
     Given Marie navigates to the Password Recovery view
     When she fills in correct username to recover
