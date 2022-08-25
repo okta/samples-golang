@@ -245,10 +245,10 @@ func (th *TestHarness) resetOrganization(ctx context.Context) error {
 			}
 			continue
 		}
-		// _, err := th.oktaClient.Policy.DeletePolicy(ctx, policies[i].Id)
-		// if err != nil {
-		// 	return err
-		// }
+		_, err := th.oktaClient.Policy.DeletePolicy(ctx, policies[i].Id)
+		if err != nil {
+			return err
+		}
 	}
 
 	rules, _, err := th.ListAppSignOnPolicyRules(ctx, th.org.appSignOnPolicy)
