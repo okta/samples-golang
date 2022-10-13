@@ -1,4 +1,4 @@
-@5.1
+@5.1 @no-ci
 Feature: 5.1 Direct Auth Social Login with Facebook Social IDP
 
   Background:

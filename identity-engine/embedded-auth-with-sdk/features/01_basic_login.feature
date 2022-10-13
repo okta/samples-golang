@@ -1,4 +1,4 @@
-@1
+@1 @no-ci
 Feature: 1.1 Basic Login with Password Factor
 
   Background:

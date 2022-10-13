@@ -1,4 +1,4 @@
-@0
+@0 @no-ci
 Feature: 0.1 Root page for Direct Auth Demo Application
 
   Background:
