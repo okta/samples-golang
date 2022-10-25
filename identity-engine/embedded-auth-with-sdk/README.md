@@ -68,7 +68,7 @@ $ selenium-server -port 4444
 
 # or, run a selenium server with its jar directly
 
-$ java -jar selenium-server-4.1.1.jar standalone --port 4444
+$ java -jar selenium-server-4.4.0.jar standalone --port 4444
 ```
 
 Then run the tests in a separate shell.

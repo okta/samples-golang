@@ -1,4 +1,4 @@
-@3
+@3 @no-ci
 Feature: 3.1 Direct Auth Password Recovery
 
   Background:
