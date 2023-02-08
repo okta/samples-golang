@@ -1,0 +1,27 @@
+vault:
+  - ISSUER:
+      devex/samples-golang: ISSUER
+  - CLIENT_ID:
+      devex/samples-golang: CLIENT_ID
+  - CLIENT_SECRET:
+      devex/samples-golang: CLIENT_SECRET
+  - USER_NAME:
+      devex/samples-golang: USER_NAME
+  - PASSWORD:
+      devex/samples-golang: PASSWORD
+  - SPA_CLIENT_ID:
+      devex/samples-golang: SPA_CLIENT_ID
+  - OKTA_CLIENT_ORGURL:
+      devex/samples-golang: OKTA_CLIENT_ORGURL
+  - OKTA_CLIENT_TOKEN:
+      devex/samples-golang: OKTA_CLIENT_TOKEN
+  - OKTA_IDX_ISSUER:
+      devex/samples-golang: OKTA_IDX_ISSUER
+  - OKTA_IDX_CLIENTID:
+      devex/samples-golang: OKTA_IDX_CLIENTID
+  - OKTA_IDX_CLIENTSECRET:
+      devex/samples-golang: OKTA_IDX_CLIENTSECRET
+  - OKTA_IDX_SCOPES:
+      devex/samples-golang: OKTA_IDX_SCOPES
+  - OKTA_IDX_REDIRECTURI:
+      devex/samples-golang: OKTA_IDX_REDIRECTURI
