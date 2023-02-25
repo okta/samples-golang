@@ -200,10 +200,6 @@ github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJ
 github.com/modern-go/reflect2 v1.0.1/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3RllmbCylyMrvgv0=
 github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
-github.com/okta/okta-idx-golang v0.2.3-0.20220204172640-d01d3c3ddfbe h1:ogF/otfEdW6CbpAn2ovequ4o949ucKVa8LN1y4f0Fwg=
-github.com/okta/okta-idx-golang v0.2.3-0.20220204172640-d01d3c3ddfbe/go.mod h1:2PD9qCga5a3GH+6QHTUQXf5Uvc06Q6eZIKgHiF8QLLE=
-github.com/okta/okta-idx-golang v0.2.3-0.20220210004607-e778b7bbadff h1:KYAgSwviOYXcjn3M6SWKmr84nfGBgN0H4oI2bs8oJIQ=
-github.com/okta/okta-idx-golang v0.2.3-0.20220210004607-e778b7bbadff/go.mod h1:2PD9qCga5a3GH+6QHTUQXf5Uvc06Q6eZIKgHiF8QLLE=
 github.com/okta/okta-idx-golang v0.2.3-0.20220211004546-63d548cd5229 h1:1syblIdE/4NOfgFsxNGsYVxS5xehaDgS3VnaaJoiGbk=
 github.com/okta/okta-idx-golang v0.2.3-0.20220211004546-63d548cd5229/go.mod h1:2PD9qCga5a3GH+6QHTUQXf5Uvc06Q6eZIKgHiF8QLLE=
 github.com/okta/okta-jwt-verifier-golang v1.1.1 h1:yL4uSwtVQ6L3m2Pq8tcVUbb8e/SZ7p/r6eduqq1YjBM=
@@ -357,8 +353,9 @@ golang.org/x/sys v0.0.0-20191026070338-33540a1f6037/go.mod h1:h1NjWce9XRLGQEsW7w
 golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
-golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1 h1:SrN+KX8Art/Sf4HNj6Zcz06G7VEz+7w9tdXTPOZ7+l4=
 golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+golang.org/x/sys v0.1.0 h1:kunALQeHf1/185U1i0GOB/fy1IPRDDpuoOOqRReG57U=
+golang.org/x/sys v0.1.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/term v0.0.0-20201117132131-f5c789dd3221/go.mod h1:Nr5EML6q2oocZ2LXRh80K7BxOlk5/8JxuGnuhpl+muw=
 golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
