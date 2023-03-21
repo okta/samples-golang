@@ -46,5 +46,8 @@
     "test:idx-embedded-auth-with-sdk": "cd identity-engine/embedded-auth-with-sdk/ && go test -v --godog.tags=~@no-ci",
     "test:idx-embedded-sign-in-widget": "cd identity-engine/embedded-sign-in-widget/ && go test -v --godog.tags=~@no-ci",
     "test": "npm run test:idx-embedded-auth-with-sdk && npm run test:idx-embedded-sign-in-widget"
+  },
+  "resolutions": {
+    "ansi-regex": "^5.0.1"
   }
 }
