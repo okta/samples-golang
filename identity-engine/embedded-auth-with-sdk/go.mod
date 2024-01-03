@@ -10,17 +10,17 @@ require (
 	github.com/howeyc/fsnotify v0.9.0
 	github.com/liyue201/goqr v0.0.0-20200803022322-df443203d4ea
 	github.com/okta/okta-idx-golang v0.2.3-0.20220211004546-63d548cd5229
-	github.com/okta/okta-sdk-golang/v2 v2.9.2
+	github.com/okta/okta-sdk-golang/v2 v2.19.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/spf13/pflag v1.0.5
 	github.com/tebeka/selenium v0.9.9
-	github.com/xlzd/gotp v0.0.0-20181030022105-c8557ba2c119
+	github.com/xlzd/gotp v0.1.0
 )
 
 require (
-	github.com/BurntSushi/toml v0.3.1 // indirect
+	github.com/BurntSushi/toml v1.1.0 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
-	github.com/cenkalti/backoff/v4 v4.1.0 // indirect
+	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cucumber/gherkin-go/v19 v19.0.3 // indirect
 	github.com/cucumber/messages-go/v16 v16.0.1 // indirect
 	github.com/felixge/httpsnoop v1.0.1 // indirect
@@ -50,11 +50,11 @@ require (
 	github.com/spf13/jwalterweatherman v1.0.0 // indirect
 	github.com/spf13/viper v1.7.1 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
-	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97 // indirect
+	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1 // indirect
-	golang.org/x/text v0.3.3 // indirect
+	golang.org/x/text v0.3.6 // indirect
 	gopkg.in/ini.v1 v1.51.0 // indirect
-	gopkg.in/square/go-jose.v2 v2.5.1 // indirect
+	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
