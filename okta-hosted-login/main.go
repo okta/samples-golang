@@ -22,7 +22,6 @@ var (
 	tpl          *template.Template
 	sessionStore = sessions.NewCookieStore([]byte("okta-hosted-login-session-store"))
 	state        = generateState()
-	nonce        = "NonceNotSetYet"
 )
 
 func init() {
@@ -69,7 +68,20 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Cache-Control", "no-cache") // See https://github.com/okta/samples-golang/issues/20
 
-	nonce, _ = oktaUtils.GenerateNonce()
+	// Create a session and generate a new nonce for each login attempt
+	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	nonce, _ := oktaUtils.GenerateNonce()
+	session.Values["nonce"] = nonce // Store the nonce in the session
+	if err := session.Save(r, w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	var redirectPath string
 
 	q := r.URL.Query()
@@ -108,9 +120,17 @@ func AuthCodeCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	session, err := sessionStore.Get(r, "okta-hosted-login-session-store")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	_, verificationError := verifyToken(exchange.IdToken)
+	// Retrieve the nonce from the session
+	sessionNonce, ok := session.Values["nonce"].(string)
+	if !ok || sessionNonce == "" {
+		fmt.Fprintln(w, "Nonce could not be retrieved from the session.")
+		return
+	}
+
+	_, verificationError := verifyToken(exchange.IdToken, sessionNonce)
 
 	if verificationError != nil {
 		fmt.Println(verificationError)
@@ -217,9 +237,9 @@ func getProfileData(r *http.Request) map[string]string {
 	return m
 }
 
-func verifyToken(t string) (*verifier.Jwt, error) {
+func verifyToken(t string, nonce string) (*verifier.Jwt, error) {
 	tv := map[string]string{}
-	tv["nonce"] = nonce
+	tv["nonce"] = nonce // Use the nonce from the session
 	tv["aud"] = os.Getenv("CLIENT_ID")
 	jv := verifier.JwtVerifier{
 		Issuer:           os.Getenv("ISSUER"),
