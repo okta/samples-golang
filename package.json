@@ -13,7 +13,7 @@
   },
   "homepage": "https://github.com/okta/samples-golang#readme",
   "devDependencies": {
-    "axios": "^0.27.0",
+    "axios": "^0.28.0",
     "dotenv": "^8.2.0",
     "find-process": "^1.4.3",
     "forever-monitor": "npm:@umpacken/forever-monitor@^1.6.1",
